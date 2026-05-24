@@ -1,11 +1,17 @@
 import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
+import { createClient } from "@supabase/supabase-js";
 import type { Area, Event, EventStatus, Registration, SportType } from "@/lib/types";
 
 type Store = {
   events: Event[];
   registrations: Registration[];
+};
+
+type RegistrationResult = {
+  ok: boolean;
+  message?: string;
 };
 
 const dataDir = path.join(process.cwd(), ".data");
@@ -139,6 +145,25 @@ const seedRegistrations: Registration[] = [
   }
 ];
 
+function supabaseConfigured() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function supabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new Error("Supabase environment variables are not configured.");
+  }
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+}
+
 function cloneStore(store: Store): Store {
   return {
     events: store.events.map((item) => ({ ...item })),
@@ -157,7 +182,7 @@ function memoryStore(): Store {
   return globalForStore.__kansaiSportsStore;
 }
 
-function readStore(): Store {
+function readLocalStore(): Store {
   if (process.env.VERCEL === "1") {
     return memoryStore();
   }
@@ -165,7 +190,7 @@ function readStore(): Store {
   try {
     if (!existsSync(dataFile)) {
       const store = seedStore();
-      writeStore(store);
+      writeLocalStore(store);
       return store;
     }
     return JSON.parse(readFileSync(dataFile, "utf8")) as Store;
@@ -174,7 +199,7 @@ function readStore(): Store {
   }
 }
 
-function writeStore(store: Store) {
+function writeLocalStore(store: Store) {
   if (process.env.VERCEL === "1") {
     globalForStore.__kansaiSportsStore = store;
     return;
@@ -195,8 +220,30 @@ function visibleStatus(event: Event): Event {
   return event;
 }
 
-export function listEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
-  return readStore()
+function nextDate(date: string) {
+  const value = new Date(`${date}T00:00:00+09:00`);
+  value.setDate(value.getDate() + 1);
+  return value.toISOString();
+}
+
+async function listSupabaseEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+  let query = supabaseAdmin().from("events").select("*").order("start_datetime", { ascending: true });
+  if (filters?.sport_type) query = query.eq("sport_type", filters.sport_type);
+  if (filters?.area) query = query.eq("area", filters.area);
+  if (filters?.date) {
+    query = query.gte("start_datetime", `${filters.date}T00:00:00+09:00`).lt("start_datetime", nextDate(filters.date));
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as Event[])
+    .map(visibleStatus)
+    .filter((event) => !filters?.onlyOpen || event.status === "open");
+}
+
+function listLocalEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+  return readLocalStore()
     .events.map(visibleStatus)
     .filter((event) => !filters?.sport_type || event.sport_type === filters.sport_type)
     .filter((event) => !filters?.area || event.area === filters.area)
@@ -205,33 +252,85 @@ export function listEvents(filters?: { sport_type?: string; area?: string; date?
     .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
 }
 
-export function getEvent(id: string) {
-  const event = readStore().events.find((item) => item.id === id);
+export async function listEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+  return supabaseConfigured() ? listSupabaseEvents(filters) : listLocalEvents(filters);
+}
+
+export async function getEvent(id: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("events").select("*").eq("id", id).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? visibleStatus(data as Event) : null;
+  }
+
+  const event = readLocalStore().events.find((item) => item.id === id);
   return event ? visibleStatus(event) : null;
 }
 
-export function saveEvent(input: Omit<Event, "id" | "created_at" | "updated_at">, id?: string) {
-  const store = readStore();
+export async function saveEvent(input: Omit<Event, "id" | "created_at" | "updated_at">, id?: string) {
   const timestamp = new Date().toISOString();
+
+  if (supabaseConfigured()) {
+    if (id) {
+      const { error } = await supabaseAdmin()
+        .from("events")
+        .update({ ...input, updated_at: timestamp })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+      return id;
+    }
+
+    const eventId = randomUUID();
+    const { error } = await supabaseAdmin()
+      .from("events")
+      .insert({ ...input, id: eventId, created_at: timestamp, updated_at: timestamp });
+    if (error) throw new Error(error.message);
+    return eventId;
+  }
+
+  const store = readLocalStore();
   if (id) {
     store.events = store.events.map((event) => (event.id === id ? { ...event, ...input, updated_at: timestamp } : event));
-    writeStore(store);
+    writeLocalStore(store);
     return id;
   }
+
   const eventId = randomUUID();
   store.events.unshift({ ...input, id: eventId, created_at: timestamp, updated_at: timestamp });
-  writeStore(store);
+  writeLocalStore(store);
   return eventId;
 }
 
-export function setEventStatus(id: string, status: EventStatus) {
-  const store = readStore();
+export async function setEventStatus(id: string, status: EventStatus) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("events").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
   store.events = store.events.map((event) => (event.id === id ? { ...event, status, updated_at: new Date().toISOString() } : event));
-  writeStore(store);
+  writeLocalStore(store);
 }
 
-export function register(eventId: string, input: { participant_name: string; contact: string; number_of_people: number; note: string }) {
-  const store = readStore();
+export async function register(eventId: string, input: { participant_name: string; contact: string; number_of_people: number; note: string }): Promise<RegistrationResult> {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin()
+      .rpc("register_for_event", {
+        p_event_id: eventId,
+        p_participant_name: input.participant_name,
+        p_contact: input.contact,
+        p_number_of_people: input.number_of_people,
+        p_note: input.note
+      })
+      .single();
+
+    if (error) return { ok: false, message: error.message };
+    const result = data as RegistrationResult;
+    return { ok: result.ok, message: result.message };
+  }
+
+  const store = readLocalStore();
   const event = store.events.find((item) => item.id === eventId);
   if (!event) return { ok: false, message: "活動が見つかりません。" };
   const current = visibleStatus(event);
@@ -239,6 +338,7 @@ export function register(eventId: string, input: { participant_name: string; con
   if (event.current_participants + input.number_of_people > event.max_participants) {
     return { ok: false, message: `残り${event.max_participants - event.current_participants}名まで申し込み可能です。` };
   }
+
   store.registrations.push({ id: randomUUID(), event_id: eventId, ...input, created_at: new Date().toISOString() });
   store.events = store.events.map((item) =>
     item.id === eventId
@@ -250,12 +350,18 @@ export function register(eventId: string, input: { participant_name: string; con
         }
       : item
   );
-  writeStore(store);
+  writeLocalStore(store);
   return { ok: true };
 }
 
-export function listRegistrations(eventId: string) {
-  return readStore().registrations.filter((item) => item.event_id === eventId);
+export async function listRegistrations(eventId: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("registrations").select("*").eq("event_id", eventId).order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Registration[];
+  }
+
+  return readLocalStore().registrations.filter((item) => item.event_id === eventId);
 }
 
 export function csvEscape(value: unknown) {

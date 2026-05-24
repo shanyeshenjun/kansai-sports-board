@@ -1,6 +1,6 @@
 # Kansai Sports Board / 関西スポーツ掲示板 / 关西运动活动板
 
-関西でスポーツ活動を探す、申し込む、管理者が活動を登録するためのモバイル優先 Web App MVP です。第一段階は市場テスト用なので、オンライン決済、地図 API、SNS ログイン、チャット、AI 推薦などは入れていません。
+関西でスポーツ活動を探す、申し込む、管理者が活動を登録するためのモバイル優先 Web App MVP です。第二段階では Supabase PostgreSQL に接続し、活動データと申し込みデータを永続化します。
 
 ## このプロジェクトでできること
 
@@ -13,23 +13,6 @@
 - 参加者一覧の確認
 - 参加者一覧の CSV ダウンロード
 
-## 対応している種目
-
-- バドミントン / 羽毛球
-- バスケットボール / 篮球
-- 卓球 / 乒乓球
-- バレーボール / 排球
-- フットサル / 室内足球
-
-## 対応しているエリア
-
-- 大阪
-- 京都
-- 神戸
-- 奈良
-- 兵庫
-- 関西その他
-
 ## 起動方法
 
 PowerShell を開いて、以下を 1 行ずつ入力します。
@@ -40,15 +23,7 @@ npm install
 npm run dev
 ```
 
-表示されたら、ブラウザで以下を開きます。
-
-```text
-http://localhost:3000
-```
-
-## よく使う URL
-
-首頁：
+ブラウザで以下を開きます。
 
 ```text
 http://localhost:3000
@@ -60,71 +35,78 @@ http://localhost:3000
 http://localhost:3000/admin
 ```
 
-## 管理者ログイン
-
-初期パスワード：
+初期管理者パスワード：
 
 ```text
 change-me-local-admin
 ```
 
-パスワードを変更したい場合は、プロジェクト直下に `.env.local` を作り、以下を書きます。
+## 環境変数
+
+`.env.local` または Vercel Environment Variables に設定します。
 
 ```text
-ADMIN_PASSWORD=your-password
+ADMIN_PASSWORD=your-admin-password
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ```
 
-## データについて
+`SUPABASE_SERVICE_ROLE_KEY` はサーバー側だけで使います。ブラウザに表示したり、GitHub にコミットしたりしないでください。
 
-現在は本地 mock データ版です。Supabase はまだ正式接続していません。
+`DATABASE_URL` は不要です。Prisma も使いません。
 
-実行中のデータは以下に保存されます。
+## Supabase セットアップ
 
-```text
-.data/mock-store.json
-```
+1. Supabase で新しい project を作成
+2. SQL Editor を開く
+3. `supabase/schema.sql` を実行
+4. サンプルデータを入れる場合は `supabase/seed.sql` を実行
+5. Project Settings > API から URL / anon key / service role key を確認
+6. Vercel に環境変数を設定して再デプロイ
 
-このため、今は以下は不要です。
+作成される主なテーブル：
 
-- Supabase の設定
-- `DATABASE_URL`
-- Prisma
+- `events`
+- `registrations`
+- `admin_users`（将来 Supabase Auth に拡張するための下準備）
 
-## Supabase に接続する場合
+また、申し込み人数を安全に更新するための PostgreSQL 関数 `register_for_event` も作成します。
 
-将来 Supabase に接続する場合は、まず Supabase プロジェクトを作り、SQL Editor で以下を実行します。
+## データ保存の挙動
 
-```text
-supabase/schema.sql
-```
+Supabase 環境変数が設定されている場合：
 
-サンプルデータも入れる場合：
+- 活動一覧は Supabase の `events` から取得
+- 申し込みは Supabase の `registrations` に保存
+- 管理画面の作成、編集、キャンセルは Supabase の `events` を更新
+- 参加者 CSV は Supabase の `registrations` から出力
 
-```text
-supabase/seed.sql
-```
+Supabase 環境変数がない場合：
 
-その後 `.env.local` に以下を設定します。
+- ローカル開発用 fallback として `.data/mock-store.json` を使います
+- Vercel で Supabase 未設定の場合は一時的なメモリ fallback になり、データは永続化されません
 
-```text
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-現在のコードはまだ本地 mock store を使っています。Supabase に切り替える場合は、`lib/store.ts` の読み書き処理を Supabase クライアントに置き換えます。
+本番テストでは必ず Supabase 環境変数を設定してください。
 
 ## Vercel に公開する場合
 
 1. GitHub にこのプロジェクトを push
 2. Vercel で New Project を作成
-3. Framework Preset は Next.js を選択
-4. 必要なら Environment Variables に `ADMIN_PASSWORD` を設定
-5. Deploy を押す
+3. GitHub repository を import
+4. Framework Preset は Next.js
+5. Environment Variables に以下を設定
 
-Vercel 上では、正式な Supabase 接続前の一時的な mock store としてメモリ上にデータを保存します。ページ表示、申し込み、管理画面の操作テストはできますが、サーバー再起動や再デプロイ後にデータは初期状態へ戻ることがあります。長期テストや実運用では Supabase 接続に切り替えてください。
+```text
+ADMIN_PASSWORD
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
 
-本格公開する前に、Supabase 接続、利用規約、プライバシーポリシー、運用ルールを確認してください。
+6. Deploy を押す
+
+既に Vercel に接続済みの場合は、GitHub に push すると自動で再デプロイされます。
 
 ## チェックコマンド
 
@@ -133,7 +115,7 @@ npm run lint
 npm run build
 ```
 
-## 第一段階で入れていない機能
+## 第一段階・第二段階でまだ入れていない機能
 
 - オンライン決済
 - Google Maps

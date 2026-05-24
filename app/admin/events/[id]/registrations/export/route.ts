@@ -13,14 +13,14 @@ export async function GET(_request: Request, context: Context) {
   }
 
   const { id } = await context.params;
-  const event = getEvent(id);
+  const event = await getEvent(id);
   if (!event) {
     return new NextResponse("Not found", { status: 404 });
   }
 
   const rows = [
     ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at"],
-    ...listRegistrations(id).map((registration) => [
+    ...(await listRegistrations(id)).map((registration) => [
       event.title,
       registration.participant_name,
       registration.contact,

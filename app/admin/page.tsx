@@ -5,7 +5,7 @@ import { formatDate, formatTime, listEvents } from "@/lib/store";
 
 export default async function AdminPage() {
   await requireAdmin();
-  const events = listEvents();
+  const events = await listEvents();
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">

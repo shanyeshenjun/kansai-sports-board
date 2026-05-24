@@ -16,7 +16,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     date: one(params.date) ?? "",
     onlyOpen: one(params.onlyOpen) === "1"
   };
-  const events = listEvents(filters);
+  const events = await listEvents(filters);
   const openCount = events.filter((event) => event.status === "open").length;
 
   return (

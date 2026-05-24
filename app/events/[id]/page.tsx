@@ -10,7 +10,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export default async function EventDetail({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { id } = await params;
   const query = await searchParams;
-  const event = getEvent(id);
+  const event = await getEvent(id);
   if (!event) notFound();
 
   const sport = sportName(event.sport_type);

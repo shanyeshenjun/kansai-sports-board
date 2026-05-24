@@ -9,7 +9,7 @@ type Params = Promise<{ id: string }>;
 export default async function EditEventPage({ params }: { params: Params }) {
   await requireAdmin();
   const { id } = await params;
-  const event = getEvent(id);
+  const event = await getEvent(id);
   if (!event) notFound();
   return (
     <main className="mx-auto min-h-screen max-w-4xl px-4 py-5">

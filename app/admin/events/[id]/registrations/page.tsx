@@ -8,9 +8,9 @@ type Params = Promise<{ id: string }>;
 export default async function RegistrationsPage({ params }: { params: Params }) {
   await requireAdmin();
   const { id } = await params;
-  const event = getEvent(id);
+  const event = await getEvent(id);
   if (!event) notFound();
-  const registrations = listRegistrations(id);
+  const registrations = await listRegistrations(id);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">

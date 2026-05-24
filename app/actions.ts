@@ -41,7 +41,7 @@ export async function logoutAction() {
 
 export async function createEventAction(formData: FormData) {
   await requireAdmin();
-  saveEvent(parseEventForm(formData));
+  await saveEvent(parseEventForm(formData));
   revalidatePath("/");
   revalidatePath("/admin");
   redirect("/admin");
@@ -49,7 +49,7 @@ export async function createEventAction(formData: FormData) {
 
 export async function updateEventAction(id: string, formData: FormData) {
   await requireAdmin();
-  saveEvent(parseEventForm(formData), id);
+  await saveEvent(parseEventForm(formData), id);
   revalidatePath("/");
   revalidatePath(`/events/${id}`);
   revalidatePath("/admin");
@@ -59,7 +59,7 @@ export async function updateEventAction(id: string, formData: FormData) {
 export async function cancelEventAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("event_id") ?? "");
-  setEventStatus(id, "cancelled");
+  await setEventStatus(id, "cancelled");
   revalidatePath("/");
   revalidatePath(`/events/${id}`);
   revalidatePath("/admin");
@@ -70,7 +70,7 @@ export async function changeStatusAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("event_id") ?? "");
   const status = String(formData.get("status") ?? "open") as EventStatus;
-  setEventStatus(id, status);
+  await setEventStatus(id, status);
   revalidatePath("/");
   revalidatePath(`/events/${id}`);
   revalidatePath("/admin");
@@ -78,7 +78,7 @@ export async function changeStatusAction(formData: FormData) {
 }
 
 export async function registerAction(eventId: string, formData: FormData) {
-  const result = register(eventId, {
+  const result = await register(eventId, {
     participant_name: String(formData.get("participant_name") ?? ""),
     contact: String(formData.get("contact") ?? ""),
     number_of_people: Number(formData.get("number_of_people") ?? 1),
