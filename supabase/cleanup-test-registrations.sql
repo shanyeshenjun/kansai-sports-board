@@ -29,6 +29,14 @@ order by r.created_at desc;
 
 -- 3. Delete and repair participant counts.
 -- Run this only after previewing the rows above.
+-- If the preview returns any real registration, do not run the delete section.
+begin;
+
+create temporary table affected_event_ids on commit drop as
+select distinct event_id
+from public.registrations
+where id in (select id from test_registration_ids);
+
 with deleted as (
   delete from public.registrations
   where id in (select id from test_registration_ids)
@@ -49,3 +57,22 @@ set
   updated_at = now()
 from totals
 where e.id = totals.event_id;
+
+-- Confirm affected event counts before committing.
+select
+  e.id,
+  e.title,
+  e.current_participants,
+  e.max_participants,
+  e.status
+from public.events e
+where e.id in (
+  select event_id
+  from affected_event_ids
+);
+
+-- If the result is correct, run:
+-- commit;
+--
+-- If anything looks wrong, run:
+-- rollback;

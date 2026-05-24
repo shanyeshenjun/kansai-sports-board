@@ -85,6 +85,24 @@ supabase/security.sql
 
 この SQL は RLS を有効化し、`events` / `registrations` / `admin_users` への直接アクセスを外部クライアントから遮断します。アプリのサーバー処理は service role key を使うため、既存機能は維持されます。
 
+実行後は必ず以下を確認してください。
+
+- トップページで活動一覧が表示される
+- 活動詳細ページが開ける
+- 申し込みを送信でき、Supabase の `registrations` に保存される
+- 管理画面にログインできる
+- 活動の作成、編集、キャンセルができる
+- 参加者一覧が表示される
+- 参加者 CSV をダウンロードできる
+
+もし実行後に機能が止まった場合は、SQL Editor で以下を実行して一時的に元の広い権限状態へ戻せます。
+
+```text
+supabase/security-rollback.sql
+```
+
+rollback 後は、Vercel の `SUPABASE_SERVICE_ROLE_KEY` が正しく設定されているかを確認してください。
+
 注意：将来ブラウザ側から Supabase を直接読む設計に変える場合は、`security.sql` 内の read-only policy を検討してください。
 
 ## テスト申し込みデータの整理
@@ -96,6 +114,8 @@ supabase/cleanup-test-registrations.sql
 ```
 
 この SQL は、明示した registration id だけを削除し、関連する `events.current_participants` も調整します。誤削除を避けるため、名前や日付だけで一括削除する運用は推奨しません。
+
+使う前に preview 結果を確認し、正式な申し込みが1件でも含まれている場合は delete section を実行しないでください。削除処理は transaction 内で動くため、確認結果が想定外なら `rollback;`、問題なければ `commit;` を実行します。
 
 ## データ保存の挙動
 

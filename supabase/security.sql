@@ -1,6 +1,7 @@
 -- Third-stage hardening SQL.
 -- Run this after confirming the app uses SUPABASE_SERVICE_ROLE_KEY only on the server.
 -- The current Next.js app does not query Supabase directly from the browser.
+-- If something goes wrong, run supabase/security-rollback.sql to restore the previous broad-access state.
 
 alter table public.events enable row level security;
 alter table public.registrations enable row level security;
