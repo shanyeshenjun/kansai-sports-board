@@ -1,0 +1,40 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { csvEscape, getEvent, listRegistrations } from "@/lib/store";
+
+type Context = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_request: Request, context: Context) {
+  const cookieStore = await cookies();
+  if (cookieStore.get("ksb_admin")?.value !== "authenticated") {
+    return NextResponse.redirect(new URL("/admin/login", _request.url));
+  }
+
+  const { id } = await context.params;
+  const event = getEvent(id);
+  if (!event) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const rows = [
+    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at"],
+    ...listRegistrations(id).map((registration) => [
+      event.title,
+      registration.participant_name,
+      registration.contact,
+      registration.number_of_people,
+      registration.note,
+      registration.created_at
+    ])
+  ];
+
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  return new NextResponse(`\uFEFF${csv}`, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${event.id}-registrations.csv"`
+    }
+  });
+}
