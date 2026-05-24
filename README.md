@@ -73,6 +73,30 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 また、申し込み人数を安全に更新するための PostgreSQL 関数 `register_for_event` も作成します。
 
+## Supabase 権限整理
+
+現在のアプリは Next.js サーバー側だけが `SUPABASE_SERVICE_ROLE_KEY` を使って Supabase にアクセスします。ブラウザから直接 Supabase を操作しない構成です。
+
+そのため、公開前には SQL Editor で以下を実行して、`anon` / `authenticated` からの直接アクセスを閉じることを推奨します。
+
+```text
+supabase/security.sql
+```
+
+この SQL は RLS を有効化し、`events` / `registrations` / `admin_users` への直接アクセスを外部クライアントから遮断します。アプリのサーバー処理は service role key を使うため、既存機能は維持されます。
+
+注意：将来ブラウザ側から Supabase を直接読む設計に変える場合は、`security.sql` 内の read-only policy を検討してください。
+
+## テスト申し込みデータの整理
+
+正式データを残したままテスト申し込みだけ削除したい場合は、Supabase Table Editor で削除したい `registrations.id` を確認し、SQL Editor で以下を使います。
+
+```text
+supabase/cleanup-test-registrations.sql
+```
+
+この SQL は、明示した registration id だけを削除し、関連する `events.current_participants` も調整します。誤削除を避けるため、名前や日付だけで一括削除する運用は推奨しません。
+
 ## データ保存の挙動
 
 Supabase 環境変数が設定されている場合：

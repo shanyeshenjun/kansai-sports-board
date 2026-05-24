@@ -63,7 +63,8 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
 
         <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:self-start">
           <h2 className="text-lg font-black text-slate-950">参加申し込み</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。連絡に必要な範囲だけ入力してください。</p>
+          <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs font-bold leading-5 text-amber-800">住所、勤務先、身分証番号などの敏感な個人情報は入力しないでください。</p>
           {query.error ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{String(query.error)}</p> : null}
           {canRegister ? (
             <form action={action} className="mt-4 grid gap-3">
@@ -78,7 +79,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
           ) : (
             <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-800">この活動は現在申し込みできません。</p>
           )}
-          <p className="mt-3 text-xs leading-5 text-slate-500">申し込み後は、主催者の連絡先で最終的な参加方法を確認してください。</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">申し込み後は、主催者の連絡先で集合場所、持ち物、参加可否を確認してください。</p>
         </aside>
       </section>
     </main>

@@ -24,6 +24,9 @@ export default async function RegistrationsPage({ params }: { params: Params }) 
             <p className="mt-1 text-sm text-slate-600">
               {event.title} / {formatDate(event.start_datetime)} {formatTime(event.start_datetime)}
             </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              参加者情報は活動連絡のためだけに利用してください。不要になったテスト申し込みは Supabase の cleanup SQL で整理できます。
+            </p>
           </div>
           <a
             className="touch-target inline-flex items-center justify-center rounded-md border border-line px-4 py-2 text-sm font-bold"

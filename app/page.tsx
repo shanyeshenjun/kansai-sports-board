@@ -22,12 +22,15 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
       <section className="mb-4 rounded-lg border border-line bg-white p-4 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-wide text-teal-700">Kansai Sports Board</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-black uppercase tracking-wide text-teal-700">Kansai Sports Board</p>
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">テスト版</span>
+        </div>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-black leading-tight text-slate-950">関西のスポーツ活動を探す</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-600">大阪・京都・神戸を中心に、参加できるスポーツ活動を掲載しています。</p>
-            <p className="mt-1 text-xs text-slate-500">中文対応は拡張予定です。</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">大阪・京都・神戸を中心に、参加しやすいスポーツ活動を掲載しています。</p>
+            <p className="mt-1 text-xs text-slate-500">現在は運用テスト中です。掲載内容は主催者に確認してから参加してください。</p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center sm:w-48">
             <div className="rounded-md bg-slate-100 px-3 py-2">
