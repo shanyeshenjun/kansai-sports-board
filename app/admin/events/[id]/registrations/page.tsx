@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/actions";
-import { formatDate, formatTime, getEvent, listRegistrations } from "@/lib/store";
+import { formatDate, formatDateTimeJST, formatTime, getEvent, listRegistrations } from "@/lib/store";
 
 type Params = Promise<{ id: string }>;
 
@@ -55,7 +55,7 @@ export default async function RegistrationsPage({ params }: { params: Params }) 
                     <td className="whitespace-nowrap py-3 pr-4">{registration.contact}</td>
                     <td className="whitespace-nowrap py-3 pr-4">{registration.number_of_people}</td>
                     <td className="min-w-48 py-3 pr-4">{registration.note || "-"}</td>
-                    <td className="whitespace-nowrap py-3 pr-4">{new Date(registration.created_at).toLocaleString("ja-JP")}</td>
+                    <td className="whitespace-nowrap py-3 pr-4">{formatDateTimeJST(registration.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

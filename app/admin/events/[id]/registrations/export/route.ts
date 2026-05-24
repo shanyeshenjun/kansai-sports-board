@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { csvEscape, getEvent, listRegistrations } from "@/lib/store";
+import { csvEscape, formatDateTimeJST, getEvent, listRegistrations } from "@/lib/store";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -19,14 +19,14 @@ export async function GET(_request: Request, context: Context) {
   }
 
   const rows = [
-    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at"],
+    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at_jst"],
     ...(await listRegistrations(id)).map((registration) => [
       event.title,
       registration.participant_name,
       registration.contact,
       registration.number_of_people,
       registration.note,
-      registration.created_at
+      formatDateTimeJST(registration.created_at)
     ])
   ];
 

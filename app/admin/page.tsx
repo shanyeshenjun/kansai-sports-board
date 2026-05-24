@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cancelEventAction, changeStatusAction, logoutAction, requireAdmin } from "@/app/actions";
 import { areaName, sportName, statusName, statuses } from "@/lib/constants";
-import { formatDate, formatTime, listEvents } from "@/lib/store";
+import { formatDate, formatDateTimeJST, formatTime, listEvents } from "@/lib/store";
 
 export default async function AdminPage() {
   await requireAdmin();
@@ -44,6 +44,9 @@ export default async function AdminPage() {
                   <h2 className="mt-2 text-lg font-black leading-snug text-slate-950">{event.title}</h2>
                   <p className="mt-1 text-sm font-medium text-slate-600">
                     {formatDate(event.start_datetime)} {formatTime(event.start_datetime)} / {event.venue_name} / {event.current_participants}/{event.max_participants}名
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    作成: {formatDateTimeJST(event.created_at)} / 更新: {formatDateTimeJST(event.updated_at)}
                   </p>
                 </div>
 
