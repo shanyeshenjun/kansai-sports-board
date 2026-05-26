@@ -19,14 +19,17 @@ export async function GET(_request: Request, context: Context) {
   }
 
   const rows = [
-    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at_jst"],
+    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at_jst", "display_name", "gender", "is_public"],
     ...(await listRegistrations(id)).map((registration) => [
       event.title,
       registration.participant_name,
       registration.contact,
       registration.number_of_people,
       registration.note,
-      formatDateTimeJST(registration.created_at)
+      formatDateTimeJST(registration.created_at),
+      registration.display_name ?? "",
+      registration.gender ?? "private",
+      registration.is_public ? "true" : "false"
     ])
   ];
 

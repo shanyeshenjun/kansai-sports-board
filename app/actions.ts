@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseEventForm, register, saveEvent, setEventStatus, softDeleteEvent } from "@/lib/store";
-import type { EventStatus } from "@/lib/types";
+import type { EventStatus, Gender } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
 
@@ -98,11 +98,17 @@ export async function changeStatusAction(formData: FormData) {
 }
 
 export async function registerAction(eventId: string, formData: FormData) {
+  const genderValue = String(formData.get("gender") ?? "private");
+  const gender: Gender = genderValue === "male" || genderValue === "female" ? genderValue : "private";
+  const isPublic = String(formData.get("is_public") ?? "false") === "true";
   const result = await register(eventId, {
     participant_name: String(formData.get("participant_name") ?? ""),
     contact: String(formData.get("contact") ?? ""),
     number_of_people: Number(formData.get("number_of_people") ?? 1),
-    note: String(formData.get("note") ?? "")
+    note: String(formData.get("note") ?? ""),
+    display_name: String(formData.get("display_name") ?? ""),
+    gender,
+    is_public: isPublic
   });
   if (!result.ok) {
     redirect(`/events/${eventId}?error=${encodeURIComponent(result.message ?? "申し込みできません")}`);

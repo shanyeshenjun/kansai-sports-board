@@ -14,3 +14,6 @@ grant select, insert, update, delete on table public.admin_users to anon, authen
 grant execute on function public.register_for_event(text, text, text, integer, text) to public;
 grant execute on function public.register_for_event(text, text, text, integer, text) to anon;
 grant execute on function public.register_for_event(text, text, text, integer, text) to authenticated;
+grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to public;
+grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to anon;
+grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to authenticated;

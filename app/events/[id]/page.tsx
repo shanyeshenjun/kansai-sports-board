@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { registerAction } from "@/app/actions";
-import { areaName, contactName, levelName, sportName, statusName } from "@/lib/constants";
-import { formatDate, formatTime, getEvent, yen } from "@/lib/store";
+import { areaName, contactName, genderName, genders, levelName, sportName, statusName } from "@/lib/constants";
+import { formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
+import type { Gender, Registration } from "@/lib/types";
 
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -12,6 +13,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   const query = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
+  const registrations = await listRegistrations(event.id);
 
   const sport = sportName(event.sport_type);
   const area = areaName(event.area);
@@ -19,6 +21,8 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   const canRegister = event.status === "open";
   const remaining = Math.max(event.max_participants - event.current_participants, 0);
   const action = registerAction.bind(null, event.id);
+  const genderStats = countGenders(registrations);
+  const publicMembers = registrations.filter((registration) => registration.is_public && registration.display_name);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
@@ -59,18 +63,56 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
             <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{event.description}</p>
             {event.notes ? <p className="mt-3 rounded-md bg-slate-100 p-3 text-sm leading-6 text-slate-700">注意事項: {event.notes}</p> : null}
           </article>
+
+          <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
+            <h2 className="font-black text-slate-950">参加予定メンバー</h2>
+            <p className="mt-2 rounded-md bg-slate-50 p-3 text-sm font-bold text-slate-700">
+              男性 {genderStats.male}人 / 女性 {genderStats.female}人 / 非公開 {genderStats.private}人
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">性別人数は匿名の集計です。公開表示を選んでいない参加者のニックネーム、本名、連絡先、備考は表示されません。</p>
+            {publicMembers.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {publicMembers.map((member) => (
+                  <span className="rounded-full border border-line bg-white px-3 py-1.5 text-sm font-bold text-slate-800" key={member.id}>
+                    {member.display_name}
+                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{genderName(member.gender)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-md bg-slate-100 p-3 text-sm text-slate-600">公開されている参加者はまだいません。</p>
+            )}
+          </article>
         </div>
 
         <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:self-start">
           <h2 className="text-lg font-black text-slate-950">参加申し込み</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。連絡に必要な範囲だけ入力してください。</p>
           <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs font-bold leading-5 text-amber-800">住所、勤務先、身分証番号などの敏感な個人情報は入力しないでください。</p>
+          <p className="mt-2 rounded-md bg-teal-50 p-2 text-xs font-bold leading-5 text-teal-900">
+            ニックネームは公開表示用です。本名や連絡先を書かないでください。連絡先・備考・本名は一般公開されません。性別は「非公開」を選べます。公開表示は任意です。
+          </p>
           {query.error ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{String(query.error)}</p> : null}
           {canRegister ? (
             <form action={action} className="mt-4 grid gap-3">
-              <input className="touch-target rounded-md border border-line px-3" name="participant_name" placeholder="名前・ニックネーム" required />
+              <input className="touch-target rounded-md border border-line px-3" name="participant_name" placeholder="名前・連絡用の呼び名" required />
               <input className="touch-target rounded-md border border-line px-3" name="contact" placeholder="連絡先" required />
               <input className="touch-target rounded-md border border-line px-3" name="number_of_people" type="number" min="1" max={remaining} defaultValue="1" required />
+              <input className="touch-target rounded-md border border-line px-3" name="display_name" placeholder="表示用ニックネーム（公開する場合は必須）" />
+              <select className="touch-target rounded-md border border-line px-3 text-sm font-bold" name="gender" defaultValue="private">
+                {genders.map((gender) => (
+                  <option key={gender.value} value={gender.value}>
+                    {gender.label}
+                  </option>
+                ))}
+              </select>
+              <select className="touch-target rounded-md border border-line px-3 text-sm font-bold" name="is_public" defaultValue="false">
+                <option value="false">公開しない</option>
+                <option value="true">公開する</option>
+              </select>
+              <p className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-500">
+                「公開する」を選ぶと、活動詳細ページにニックネームと性別区分が表示されます。連絡先・備考・本名は公開されません。
+              </p>
               <textarea className="min-h-24 rounded-md border border-line px-3 py-2" name="note" placeholder="備考（任意）" />
               <button className="touch-target rounded-md bg-teal-700 px-4 py-3 text-sm font-black text-white" type="submit">
                 送信する
@@ -93,4 +135,13 @@ function Info({ label, value }: { label: string; value: string }) {
       <dd className="font-bold text-slate-900">{value}</dd>
     </div>
   );
+}
+
+function countGenders(registrations: Registration[]) {
+  const initial: Record<Gender, number> = { male: 0, female: 0, private: 0 };
+  return registrations.reduce((total, registration) => {
+    const gender = registration.gender === "male" || registration.gender === "female" ? registration.gender : "private";
+    total[gender] += registration.number_of_people;
+    return total;
+  }, initial);
 }

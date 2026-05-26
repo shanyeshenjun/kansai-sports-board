@@ -81,6 +81,14 @@ supabase/20260527_add_event_soft_delete.sql
 
 この migration は `events.deleted_at` を追加し、削除済み活動への申し込みを受け付けないよう `register_for_event` を更新します。申し込みデータは削除しません。
 
+参加者の公開表示と性別人数統計を追加する場合は、デプロイ前に SQL Editor で以下を実行してください。
+
+```text
+supabase/20260527_add_public_registration_fields.sql
+```
+
+この migration は `registrations.display_name`、`registrations.gender`、`registrations.is_public` を追加します。既存の申し込みは `is_public = false`、`gender = private` のままなので、過去の参加者名が公開されることはありません。
+
 ## Supabase 権限整理
 
 現在のアプリは Next.js サーバー側だけが `SUPABASE_SERVICE_ROLE_KEY` を使って Supabase にアクセスします。ブラウザから直接 Supabase を操作しない構成です。
@@ -102,6 +110,7 @@ supabase/security.sql
 - 活動の作成、編集、キャンセルができる
 - 参加者一覧が表示される
 - 参加者 CSV をダウンロードできる
+- 活動詳細ページで、公開表示を選んだ参加者だけがニックネーム表示される
 
 もし実行後に機能が止まった場合は、SQL Editor で以下を実行して一時的に元の広い権限状態へ戻せます。
 
@@ -131,6 +140,7 @@ Supabase 環境変数が設定されている場合：
 
 - 活動一覧は Supabase の `events` から取得
 - 申し込みは Supabase の `registrations` に保存
+- 公開参加者表示は `registrations.display_name` / `gender` / `is_public` を使用
 - 管理画面の作成、編集、キャンセルは Supabase の `events` を更新
 - 管理画面の削除は `events.deleted_at` を更新するソフト削除
 - 参加者 CSV は Supabase の `registrations` から出力

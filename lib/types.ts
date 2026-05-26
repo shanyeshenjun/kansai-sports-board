@@ -3,6 +3,7 @@ export type Area = "osaka" | "kyoto" | "kobe" | "nara" | "hyogo" | "kansai_other
 export type EventStatus = "open" | "full" | "finished" | "cancelled";
 export type EventLevel = "beginner_welcome" | "beginner" | "intermediate" | "advanced" | "anyone";
 export type ContactType = "wechat" | "line" | "instagram" | "email" | "phone";
+export type Gender = "male" | "female" | "private";
 
 export type Event = {
   id: string;
@@ -35,5 +36,8 @@ export type Registration = {
   contact: string;
   number_of_people: number;
   note: string;
+  display_name?: string | null;
+  gender?: Gender | null;
+  is_public?: boolean | null;
   created_at: string;
 };

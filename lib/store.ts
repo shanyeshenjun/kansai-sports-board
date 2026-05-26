@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
-import type { Area, Event, EventStatus, Registration, SportType } from "@/lib/types";
+import type { Area, Event, EventStatus, Gender, Registration, SportType } from "@/lib/types";
 
 type Store = {
   events: Event[];
@@ -149,6 +149,9 @@ const seedRegistrations: Registration[] = [
     contact: "line:yamada",
     number_of_people: 2,
     note: "初心者2名です",
+    display_name: "山田",
+    gender: "private",
+    is_public: false,
     created_at: now
   }
 ];
@@ -349,7 +352,13 @@ export async function softDeleteEvent(id: string) {
   writeLocalStore(store);
 }
 
-export async function register(eventId: string, input: { participant_name: string; contact: string; number_of_people: number; note: string }): Promise<RegistrationResult> {
+export async function register(
+  eventId: string,
+  input: { participant_name: string; contact: string; number_of_people: number; note: string; display_name: string; gender: Gender; is_public: boolean }
+): Promise<RegistrationResult> {
+  const displayName = input.is_public ? input.display_name.trim() : input.display_name.trim();
+  if (input.is_public && !displayName) return { ok: false, message: "公開表示する場合は、表示用ニックネームを入力してください。" };
+
   if (supabaseConfigured()) {
     const event = await getEvent(eventId);
     if (!event) return { ok: false, message: "活動が見つかりません。" };
@@ -361,7 +370,10 @@ export async function register(eventId: string, input: { participant_name: strin
         p_participant_name: input.participant_name,
         p_contact: input.contact,
         p_number_of_people: input.number_of_people,
-        p_note: input.note
+        p_note: input.note,
+        p_display_name: displayName || null,
+        p_gender: input.gender,
+        p_is_public: input.is_public
       })
       .single();
 
@@ -380,7 +392,7 @@ export async function register(eventId: string, input: { participant_name: strin
     return { ok: false, message: `残り${event.max_participants - event.current_participants}名まで申し込み可能です。` };
   }
 
-  store.registrations.push({ id: randomUUID(), event_id: eventId, ...input, created_at: new Date().toISOString() });
+  store.registrations.push({ id: randomUUID(), event_id: eventId, ...input, display_name: displayName || null, created_at: new Date().toISOString() });
   store.events = store.events.map((item) =>
     item.id === eventId
       ? {
