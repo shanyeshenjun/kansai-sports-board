@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
-import type { Area, Event, EventStatus, Gender, Registration, SportType } from "@/lib/types";
+import type { Area, Event, EventStatus, Gender, Registration, SkillLevel, SportType } from "@/lib/types";
 
 type Store = {
   events: Event[];
@@ -151,6 +151,7 @@ const seedRegistrations: Registration[] = [
     note: "初心者2名です",
     display_name: "山田",
     gender: "private",
+    skill_level: null,
     is_public: false,
     created_at: now
   }
@@ -354,10 +355,11 @@ export async function softDeleteEvent(id: string) {
 
 export async function register(
   eventId: string,
-  input: { participant_name: string; contact: string; number_of_people: number; note: string; display_name: string; gender: Gender; is_public: boolean }
+  input: { participant_name: string; contact: string; number_of_people: number; note: string; display_name: string; gender: Gender; skill_level: SkillLevel | null; is_public: boolean }
 ): Promise<RegistrationResult> {
   const displayName = input.is_public ? input.display_name.trim() : input.display_name.trim();
   if (input.is_public && !displayName) return { ok: false, message: "公開表示する場合は、表示用ニックネームを入力してください。" };
+  if (!input.skill_level) return { ok: false, message: "レベルを選択してください。" };
 
   if (supabaseConfigured()) {
     const event = await getEvent(eventId);
@@ -373,6 +375,7 @@ export async function register(
         p_note: input.note,
         p_display_name: displayName || null,
         p_gender: input.gender,
+        p_skill_level: input.skill_level,
         p_is_public: input.is_public
       })
       .single();

@@ -33,6 +33,7 @@ create table if not exists public.registrations (
   note text not null default '',
   display_name text,
   gender text not null default 'private' check (gender in ('male', 'female', 'private')),
+  skill_level integer check (skill_level between 1 and 5),
   is_public boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -58,6 +59,7 @@ create or replace function public.register_for_event(
   p_note text default '',
   p_display_name text default null,
   p_gender text default 'private',
+  p_skill_level integer default null,
   p_is_public boolean default false
 )
 returns table(ok boolean, message text, registration_id text)
@@ -82,6 +84,11 @@ begin
 
   if coalesce(p_gender, 'private') not in ('male', 'female', 'private') then
     return query select false, '性別の選択が正しくありません。', null::text;
+    return;
+  end if;
+
+  if p_skill_level is null or p_skill_level not between 1 and 5 then
+    return query select false, 'レベルを選択してください。', null::text;
     return;
   end if;
 
@@ -126,6 +133,7 @@ begin
     note,
     display_name,
     gender,
+    skill_level,
     is_public
   ) values (
     v_registration_id,
@@ -136,6 +144,7 @@ begin
     coalesce(p_note, ''),
     nullif(trim(coalesce(p_display_name, '')), ''),
     coalesce(p_gender, 'private'),
+    p_skill_level,
     coalesce(p_is_public, false)
   );
 

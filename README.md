@@ -87,7 +87,7 @@ supabase/20260527_add_event_soft_delete.sql
 supabase/20260527_add_public_registration_fields.sql
 ```
 
-この migration は `registrations.display_name`、`registrations.gender`、`registrations.is_public` を追加します。既存の申し込みは `is_public = false`、`gender = private` のままなので、過去の参加者名が公開されることはありません。
+この migration は `registrations.display_name`、`registrations.gender`、`registrations.skill_level`、`registrations.is_public` を追加します。既存の申し込みは `is_public = false`、`gender = private`、`skill_level = null` のままなので、過去の参加者名が公開されることはありません。
 
 ## Supabase 権限整理
 
@@ -140,7 +140,7 @@ Supabase 環境変数が設定されている場合：
 
 - 活動一覧は Supabase の `events` から取得
 - 申し込みは Supabase の `registrations` に保存
-- 公開参加者表示は `registrations.display_name` / `gender` / `is_public` を使用
+- 公開参加者表示は `registrations.display_name` / `gender` / `skill_level` / `is_public` を使用
 - 管理画面の作成、編集、キャンセルは Supabase の `events` を更新
 - 管理画面の削除は `events.deleted_at` を更新するソフト削除
 - 参加者 CSV は Supabase の `registrations` から出力

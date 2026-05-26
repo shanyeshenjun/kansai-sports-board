@@ -11,9 +11,23 @@ grant select, insert, update, delete on table public.events to anon, authenticat
 grant select, insert, update, delete on table public.registrations to anon, authenticated;
 grant select, insert, update, delete on table public.admin_users to anon, authenticated;
 
-grant execute on function public.register_for_event(text, text, text, integer, text) to public;
-grant execute on function public.register_for_event(text, text, text, integer, text) to anon;
-grant execute on function public.register_for_event(text, text, text, integer, text) to authenticated;
-grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to public;
-grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to anon;
-grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to authenticated;
+do $$
+begin
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text)') is not null then
+    grant execute on function public.register_for_event(text, text, text, integer, text) to public;
+    grant execute on function public.register_for_event(text, text, text, integer, text) to anon;
+    grant execute on function public.register_for_event(text, text, text, integer, text) to authenticated;
+  end if;
+
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text,text,text,boolean)') is not null then
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to public;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to anon;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to authenticated;
+  end if;
+
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text,text,text,integer,boolean)') is not null then
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to public;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to anon;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to authenticated;
+  end if;
+end $$;

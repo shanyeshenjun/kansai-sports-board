@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseEventForm, register, saveEvent, setEventStatus, softDeleteEvent } from "@/lib/store";
-import type { EventStatus, Gender } from "@/lib/types";
+import type { EventStatus, Gender, SkillLevel } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
 
@@ -100,6 +100,8 @@ export async function changeStatusAction(formData: FormData) {
 export async function registerAction(eventId: string, formData: FormData) {
   const genderValue = String(formData.get("gender") ?? "private");
   const gender: Gender = genderValue === "male" || genderValue === "female" ? genderValue : "private";
+  const skillValue = Number(formData.get("skill_level") ?? 0);
+  const skillLevel = skillValue >= 1 && skillValue <= 5 ? (skillValue as SkillLevel) : null;
   const isPublic = String(formData.get("is_public") ?? "false") === "true";
   const result = await register(eventId, {
     participant_name: String(formData.get("participant_name") ?? ""),
@@ -108,6 +110,7 @@ export async function registerAction(eventId: string, formData: FormData) {
     note: String(formData.get("note") ?? ""),
     display_name: String(formData.get("display_name") ?? ""),
     gender,
+    skill_level: skillLevel,
     is_public: isPublic
   });
   if (!result.ok) {

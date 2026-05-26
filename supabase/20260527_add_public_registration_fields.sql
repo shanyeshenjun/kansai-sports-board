@@ -4,14 +4,22 @@
 alter table public.registrations
 add column if not exists display_name text,
 add column if not exists gender text,
+add column if not exists skill_level integer,
 add column if not exists is_public boolean;
 
 alter table public.registrations
 drop constraint if exists registrations_gender_check;
 
 alter table public.registrations
+drop constraint if exists registrations_skill_level_check;
+
+alter table public.registrations
 add constraint registrations_gender_check
 check (gender in ('male', 'female', 'private'));
+
+alter table public.registrations
+add constraint registrations_skill_level_check
+check (skill_level is null or skill_level between 1 and 5);
 
 update public.registrations
 set
@@ -27,6 +35,10 @@ alter column gender set not null,
 alter column is_public set default false,
 alter column is_public set not null;
 
+drop function if exists public.register_for_event(text, text, text, integer, text);
+drop function if exists public.register_for_event(text, text, text, integer, text, text, text, boolean);
+drop function if exists public.register_for_event(text, text, text, integer, text, text, text, integer, boolean);
+
 create or replace function public.register_for_event(
   p_event_id text,
   p_participant_name text,
@@ -35,6 +47,7 @@ create or replace function public.register_for_event(
   p_note text default '',
   p_display_name text default null,
   p_gender text default 'private',
+  p_skill_level integer default null,
   p_is_public boolean default false
 )
 returns table(ok boolean, message text, registration_id text)
@@ -59,6 +72,11 @@ begin
 
   if coalesce(p_gender, 'private') not in ('male', 'female', 'private') then
     return query select false, '性別の選択が正しくありません。', null::text;
+    return;
+  end if;
+
+  if p_skill_level is null or p_skill_level not between 1 and 5 then
+    return query select false, 'レベルを選択してください。', null::text;
     return;
   end if;
 
@@ -104,6 +122,7 @@ begin
     note,
     display_name,
     gender,
+    skill_level,
     is_public
   ) values (
     v_registration_id,
@@ -114,6 +133,7 @@ begin
     coalesce(p_note, ''),
     nullif(trim(coalesce(p_display_name, '')), ''),
     coalesce(p_gender, 'private'),
+    p_skill_level,
     coalesce(p_is_public, false)
   );
 
@@ -129,4 +149,7 @@ begin
 end;
 $$;
 
-grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to service_role;
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from public;
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from anon;
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from authenticated;
+grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to service_role;

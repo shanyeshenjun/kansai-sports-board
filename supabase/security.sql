@@ -13,16 +13,29 @@ revoke all on table public.registrations from anon, authenticated;
 revoke all on table public.admin_users from anon, authenticated;
 
 -- Do not allow public clients to execute the registration function directly.
-revoke all on function public.register_for_event(text, text, text, integer, text) from public;
-revoke all on function public.register_for_event(text, text, text, integer, text) from anon;
-revoke all on function public.register_for_event(text, text, text, integer, text) from authenticated;
-revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from public;
-revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from anon;
-revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from authenticated;
+do $$
+begin
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text)') is not null then
+    revoke all on function public.register_for_event(text, text, text, integer, text) from public;
+    revoke all on function public.register_for_event(text, text, text, integer, text) from anon;
+    revoke all on function public.register_for_event(text, text, text, integer, text) from authenticated;
+    grant execute on function public.register_for_event(text, text, text, integer, text) to service_role;
+  end if;
 
--- The deployed Next.js server uses the service role key and can keep operating.
-grant execute on function public.register_for_event(text, text, text, integer, text) to service_role;
-grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to service_role;
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text,text,text,boolean)') is not null then
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from public;
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from anon;
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, boolean) from authenticated;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, boolean) to service_role;
+  end if;
+
+  if to_regprocedure('public.register_for_event(text,text,text,integer,text,text,text,integer,boolean)') is not null then
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from public;
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from anon;
+    revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from authenticated;
+    grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to service_role;
+  end if;
+end $$;
 
 -- Optional read-only browser policy for a future client-side Supabase version.
 -- Do not enable this unless you intentionally move event list reads to the browser.

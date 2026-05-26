@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/actions";
-import { genderName } from "@/lib/constants";
+import { genderName, skillLevelName } from "@/lib/constants";
 import { formatDate, formatDateTimeJST, formatTime, getAdminEvent, listRegistrations } from "@/lib/store";
 
 type Params = Promise<{ id: string }>;
@@ -47,6 +47,7 @@ export default async function RegistrationsPage({ params }: { params: Params }) 
                   <th className="whitespace-nowrap py-2 pr-4">人数</th>
                   <th className="whitespace-nowrap py-2 pr-4">表示名</th>
                   <th className="whitespace-nowrap py-2 pr-4">性別</th>
+                  <th className="whitespace-nowrap py-2 pr-4">レベル</th>
                   <th className="whitespace-nowrap py-2 pr-4">公開</th>
                   <th className="whitespace-nowrap py-2 pr-4">備考</th>
                   <th className="whitespace-nowrap py-2 pr-4">申込日時</th>
@@ -60,6 +61,7 @@ export default async function RegistrationsPage({ params }: { params: Params }) 
                     <td className="whitespace-nowrap py-3 pr-4">{registration.number_of_people}</td>
                     <td className="whitespace-nowrap py-3 pr-4">{registration.display_name || "-"}</td>
                     <td className="whitespace-nowrap py-3 pr-4">{genderName(registration.gender)}</td>
+                    <td className="whitespace-nowrap py-3 pr-4">{skillLevelName(registration.skill_level)}</td>
                     <td className="whitespace-nowrap py-3 pr-4">{registration.is_public ? "公開" : "非公開"}</td>
                     <td className="min-w-48 py-3 pr-4">{registration.note || "-"}</td>
                     <td className="whitespace-nowrap py-3 pr-4">{formatDateTimeJST(registration.created_at)}</td>
