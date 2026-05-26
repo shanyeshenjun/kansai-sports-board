@@ -1,4 +1,5 @@
 import { EventCard } from "@/components/event-card";
+import { EventCalendar } from "@/components/event-calendar";
 import { areas, sports } from "@/lib/constants";
 import { listEvents } from "@/lib/store";
 
@@ -20,7 +21,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const openCount = events.filter((event) => event.status === "open").length;
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-5">
       <section className="mb-4 rounded-lg border border-line bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-black uppercase tracking-wide text-teal-700">Kansai Sports Board</p>
@@ -74,18 +75,21 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         </div>
       </form>
 
-      {events.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center">
-          <h2 className="font-black text-slate-900">現在、該当する活動はありません</h2>
-          <p className="mt-2 text-sm text-slate-500">条件を変えてもう一度検索してください。</p>
-        </div>
-      )}
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr] lg:items-start">
+        <EventCalendar events={events} />
+        {events.length ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {events.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center">
+            <h2 className="font-black text-slate-900">現在、該当する活動はありません</h2>
+            <p className="mt-2 text-sm text-slate-500">条件を変えてもう一度検索してください。</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }

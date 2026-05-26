@@ -53,6 +53,19 @@ export const venueOptions = [
   "東淀川スポーツセンター"
 ] as const;
 
+export const venueShortNames: Record<string, string> = {
+  "西SC（阿波座）スポーツセンター": "西SC",
+  "城東スポーツセンター": "城東",
+  "西成スポーツセンター": "西成",
+  "港区スポーツセンター": "港区",
+  "天王寺スポーツセンター": "天王寺",
+  "扇町スポーツセンター": "扇町",
+  "阿倍野SCスポーツセンター": "阿倍野",
+  "東成スポーツセンター": "東成",
+  "浪速スポーツセンター": "浪速",
+  "東淀川スポーツセンター": "東淀川"
+};
+
 export const timeSlotOptions = [
   { value: "09:00-12:00", label: "09:00 - 12:00", start: "09:00", end: "12:00" },
   { value: "12:00-15:00", label: "12:00 - 15:00", start: "12:00", end: "15:00" },
@@ -65,3 +78,8 @@ export const areaName = (value: Area) => areas.find((item) => item.value === val
 export const statusName = (value: EventStatus) => statuses.find((item) => item.value === value) ?? statuses[0];
 export const levelName = (value: EventLevel) => levels.find((item) => item.value === value) ?? levels[0];
 export const contactName = (value: ContactType) => contactTypes.find((item) => item.value === value) ?? contactTypes[0];
+export const venueShortName = (value: string) => {
+  if (venueShortNames[value]) return venueShortNames[value];
+  const fallback = value.replace(/スポーツセンター/g, "").slice(0, 4);
+  return fallback || "その他";
+};
