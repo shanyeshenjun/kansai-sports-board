@@ -23,6 +23,7 @@ export type Event = {
   description: string;
   notes: string;
   status: EventStatus;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 };

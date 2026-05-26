@@ -73,6 +73,14 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 また、申し込み人数を安全に更新するための PostgreSQL 関数 `register_for_event` も作成します。
 
+既存の Supabase project に第四段階の「活動の削除 / 非表示」を追加する場合は、デプロイ前に SQL Editor で以下を実行してください。
+
+```text
+supabase/20260527_add_event_soft_delete.sql
+```
+
+この migration は `events.deleted_at` を追加し、削除済み活動への申し込みを受け付けないよう `register_for_event` を更新します。申し込みデータは削除しません。
+
 ## Supabase 権限整理
 
 現在のアプリは Next.js サーバー側だけが `SUPABASE_SERVICE_ROLE_KEY` を使って Supabase にアクセスします。ブラウザから直接 Supabase を操作しない構成です。
@@ -124,6 +132,7 @@ Supabase 環境変数が設定されている場合：
 - 活動一覧は Supabase の `events` から取得
 - 申し込みは Supabase の `registrations` に保存
 - 管理画面の作成、編集、キャンセルは Supabase の `events` を更新
+- 管理画面の削除は `events.deleted_at` を更新するソフト削除
 - 参加者 CSV は Supabase の `registrations` から出力
 
 Supabase 環境変数がない場合：

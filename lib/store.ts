@@ -14,6 +14,14 @@ type RegistrationResult = {
   message?: string;
 };
 
+type EventFilters = {
+  sport_type?: string;
+  area?: string;
+  date?: string;
+  onlyOpen?: boolean;
+  includeDeleted?: boolean;
+};
+
 const dataDir = path.join(process.cwd(), ".data");
 const dataFile = path.join(dataDir, "mock-store.json");
 const globalForStore = globalThis as typeof globalThis & { __kansaiSportsStore?: Store };
@@ -213,7 +221,12 @@ function writeLocalStore(store: Store) {
   }
 }
 
+function isDeleted(event: Event) {
+  return Boolean(event.deleted_at);
+}
+
 function visibleStatus(event: Event): Event {
+  if (isDeleted(event)) return event;
   if (event.status === "cancelled" || event.status === "finished" || event.status === "full") return event;
   if (event.current_participants >= event.max_participants) return { ...event, status: "full" };
   if (new Date(event.end_datetime).getTime() < Date.now()) return { ...event, status: "finished" };
@@ -226,8 +239,9 @@ function nextDate(date: string) {
   return value.toISOString();
 }
 
-async function listSupabaseEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+async function listSupabaseEvents(filters?: EventFilters) {
   let query = supabaseAdmin().from("events").select("*").order("start_datetime", { ascending: true });
+  if (!filters?.includeDeleted) query = query.is("deleted_at", null);
   if (filters?.sport_type) query = query.eq("sport_type", filters.sport_type);
   if (filters?.area) query = query.eq("area", filters.area);
   if (filters?.date) {
@@ -242,9 +256,10 @@ async function listSupabaseEvents(filters?: { sport_type?: string; area?: string
     .filter((event) => !filters?.onlyOpen || event.status === "open");
 }
 
-function listLocalEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+function listLocalEvents(filters?: EventFilters) {
   return readLocalStore()
     .events.map(visibleStatus)
+    .filter((event) => filters?.includeDeleted || !isDeleted(event))
     .filter((event) => !filters?.sport_type || event.sport_type === filters.sport_type)
     .filter((event) => !filters?.area || event.area === filters.area)
     .filter((event) => !filters?.date || event.start_datetime.slice(0, 10) === filters.date)
@@ -252,19 +267,26 @@ function listLocalEvents(filters?: { sport_type?: string; area?: string; date?: 
     .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
 }
 
-export async function listEvents(filters?: { sport_type?: string; area?: string; date?: string; onlyOpen?: boolean }) {
+export async function listEvents(filters?: EventFilters) {
   return supabaseConfigured() ? listSupabaseEvents(filters) : listLocalEvents(filters);
 }
 
-export async function getEvent(id: string) {
+export async function getEvent(id: string, options?: { includeDeleted?: boolean }) {
   if (supabaseConfigured()) {
-    const { data, error } = await supabaseAdmin().from("events").select("*").eq("id", id).maybeSingle();
+    let query = supabaseAdmin().from("events").select("*").eq("id", id);
+    if (!options?.includeDeleted) query = query.is("deleted_at", null);
+    const { data, error } = await query.maybeSingle();
     if (error) throw new Error(error.message);
     return data ? visibleStatus(data as Event) : null;
   }
 
   const event = readLocalStore().events.find((item) => item.id === id);
-  return event ? visibleStatus(event) : null;
+  if (!event || (!options?.includeDeleted && isDeleted(event))) return null;
+  return visibleStatus(event);
+}
+
+export async function getAdminEvent(id: string) {
+  return getEvent(id, { includeDeleted: true });
 }
 
 export async function saveEvent(input: Omit<Event, "id" | "created_at" | "updated_at">, id?: string) {
@@ -313,8 +335,26 @@ export async function setEventStatus(id: string, status: EventStatus) {
   writeLocalStore(store);
 }
 
+export async function softDeleteEvent(id: string) {
+  const timestamp = new Date().toISOString();
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("events").update({ deleted_at: timestamp, updated_at: timestamp }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
+  store.events = store.events.map((event) => (event.id === id ? { ...event, deleted_at: timestamp, updated_at: timestamp } : event));
+  writeLocalStore(store);
+}
+
 export async function register(eventId: string, input: { participant_name: string; contact: string; number_of_people: number; note: string }): Promise<RegistrationResult> {
   if (supabaseConfigured()) {
+    const event = await getEvent(eventId);
+    if (!event) return { ok: false, message: "活動が見つかりません。" };
+    if (event.status !== "open") return { ok: false, message: "この活動は現在受付していません。" };
+
     const { data, error } = await supabaseAdmin()
       .rpc("register_for_event", {
         p_event_id: eventId,
@@ -333,6 +373,7 @@ export async function register(eventId: string, input: { participant_name: strin
   const store = readLocalStore();
   const event = store.events.find((item) => item.id === eventId);
   if (!event) return { ok: false, message: "活動が見つかりません。" };
+  if (isDeleted(event)) return { ok: false, message: "活動が見つかりません。" };
   const current = visibleStatus(event);
   if (current.status !== "open") return { ok: false, message: "この活動は現在受付していません。" };
   if (event.current_participants + input.number_of_people > event.max_participants) {
@@ -421,7 +462,16 @@ export function formatDateTimeJST(value: string) {
 }
 
 export function datetimeLocal(value: string) {
-  const date = new Date(value);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tokyo"
+  }).formatToParts(new Date(value));
+
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
 }

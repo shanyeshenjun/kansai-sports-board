@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { csvEscape, formatDateTimeJST, getEvent, listRegistrations } from "@/lib/store";
+import { csvEscape, formatDateTimeJST, getAdminEvent, listRegistrations } from "@/lib/store";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -13,7 +13,7 @@ export async function GET(_request: Request, context: Context) {
   }
 
   const { id } = await context.params;
-  const event = await getEvent(id);
+  const event = await getAdminEvent(id);
   if (!event) {
     return new NextResponse("Not found", { status: 404 });
   }

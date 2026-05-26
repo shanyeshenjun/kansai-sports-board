@@ -1,7 +1,8 @@
 import type { InputHTMLAttributes } from "react";
 import { areas, contactTypes, levels, sports, statuses } from "@/lib/constants";
 import type { Event } from "@/lib/types";
-import { datetimeLocal } from "@/lib/store";
+import { TimeSlotFields } from "@/components/time-slot-fields";
+import { VenueSelectFields } from "@/components/venue-select-fields";
 
 export function EventForm({ event, action }: { event?: Event; action: (formData: FormData) => Promise<void> }) {
   return (
@@ -11,12 +12,9 @@ export function EventForm({ event, action }: { event?: Event; action: (formData:
         <Select name="sport_type" label="種目" defaultValue={event?.sport_type} options={sports.map((item) => [item.value, item.label])} />
         <Select name="area" label="エリア" defaultValue={event?.area} options={areas.map((item) => [item.value, item.label])} />
       </div>
-      <Field name="venue_name" label="会場名" defaultValue={event?.venue_name} required />
+      <VenueSelectFields defaultValue={event?.venue_name} />
       <Field name="address" label="住所" defaultValue={event?.address} required />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field name="start_datetime" label="開始日時" type="datetime-local" defaultValue={event ? datetimeLocal(event.start_datetime) : ""} required />
-        <Field name="end_datetime" label="終了日時" type="datetime-local" defaultValue={event ? datetimeLocal(event.end_datetime) : ""} required />
-      </div>
+      <TimeSlotFields defaultStart={event?.start_datetime} defaultEnd={event?.end_datetime} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Field name="fee" label="参加費（円）" type="number" min="0" defaultValue={event?.fee ?? 0} required />
         <Field name="max_participants" label="最大人数" type="number" min="1" defaultValue={event?.max_participants ?? 12} required />

@@ -28,4 +28,4 @@ grant execute on function public.register_for_event(text, text, text, integer, t
 -- on public.events
 -- for select
 -- to anon
--- using (status in ('open', 'full', 'finished', 'cancelled'));
+-- using (deleted_at is null and status in ('open', 'full', 'finished', 'cancelled'));

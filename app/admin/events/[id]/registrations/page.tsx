@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/actions";
-import { formatDate, formatDateTimeJST, formatTime, getEvent, listRegistrations } from "@/lib/store";
+import { formatDate, formatDateTimeJST, formatTime, getAdminEvent, listRegistrations } from "@/lib/store";
 
 type Params = Promise<{ id: string }>;
 
 export default async function RegistrationsPage({ params }: { params: Params }) {
   await requireAdmin();
   const { id } = await params;
-  const event = await getEvent(id);
+  const event = await getAdminEvent(id);
   if (!event) notFound();
   const registrations = await listRegistrations(id);
 

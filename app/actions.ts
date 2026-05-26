@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { parseEventForm, register, saveEvent, setEventStatus } from "@/lib/store";
+import { parseEventForm, register, saveEvent, setEventStatus, softDeleteEvent } from "@/lib/store";
 import type { EventStatus } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
@@ -60,6 +60,26 @@ export async function cancelEventAction(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("event_id") ?? "");
   await setEventStatus(id, "cancelled");
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+export async function finishEventAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("event_id") ?? "");
+  await setEventStatus(id, "finished");
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
+export async function deleteEventAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("event_id") ?? "");
+  await softDeleteEvent(id);
   revalidatePath("/");
   revalidatePath(`/events/${id}`);
   revalidatePath("/admin");

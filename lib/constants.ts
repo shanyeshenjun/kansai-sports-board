@@ -40,6 +40,26 @@ export const contactTypes: Array<{ value: ContactType; label: string }> = [
   { value: "phone", label: "電話" }
 ];
 
+export const venueOptions = [
+  "西SC（阿波座）スポーツセンター",
+  "城東スポーツセンター",
+  "西成スポーツセンター",
+  "港区スポーツセンター",
+  "天王寺スポーツセンター",
+  "扇町スポーツセンター",
+  "阿倍野SCスポーツセンター",
+  "東成スポーツセンター",
+  "浪速スポーツセンター",
+  "東淀川スポーツセンター"
+] as const;
+
+export const timeSlotOptions = [
+  { value: "09:00-12:00", label: "09:00 - 12:00", start: "09:00", end: "12:00" },
+  { value: "12:00-15:00", label: "12:00 - 15:00", start: "12:00", end: "15:00" },
+  { value: "15:00-18:00", label: "15:00 - 18:00", start: "15:00", end: "18:00" },
+  { value: "18:00-21:00", label: "18:00 - 21:00", start: "18:00", end: "21:00" }
+] as const;
+
 export const sportName = (value: SportType) => sports.find((item) => item.value === value) ?? sports[0];
 export const areaName = (value: Area) => areas.find((item) => item.value === value) ?? areas[0];
 export const statusName = (value: EventStatus) => statuses.find((item) => item.value === value) ?? statuses[0];

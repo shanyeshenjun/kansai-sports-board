@@ -19,6 +19,7 @@ create table if not exists public.events (
   description text not null default '',
   notes text not null default '',
   status text not null default 'open' check (status in ('open', 'full', 'finished', 'cancelled')),
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -43,6 +44,7 @@ create table if not exists public.admin_users (
 create index if not exists events_start_datetime_idx on public.events(start_datetime);
 create index if not exists events_sport_type_idx on public.events(sport_type);
 create index if not exists events_area_idx on public.events(area);
+create index if not exists events_deleted_at_idx on public.events(deleted_at);
 create index if not exists registrations_event_id_idx on public.registrations(event_id);
 
 create or replace function public.register_for_event(
@@ -70,6 +72,7 @@ begin
   select * into v_event
   from public.events
   where id = p_event_id
+    and deleted_at is null
   for update;
 
   if not found then
