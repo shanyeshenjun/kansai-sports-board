@@ -1,8 +1,8 @@
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
-import type { Area, Event, EventStatus, Gender, Registration, SkillLevel, SportType } from "@/lib/types";
+import type { Area, Event, EventStatus, Gender, Registration, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
 
 type Store = {
   events: Event[];
@@ -12,6 +12,35 @@ type Store = {
 type RegistrationResult = {
   ok: boolean;
   message?: string;
+  registration_id?: string | null;
+  cancel_code?: string | null;
+};
+
+type CancellationPreview =
+  | {
+      ok: true;
+      event: Event;
+      registration: Registration;
+      deadline: string;
+    }
+  | {
+      ok: false;
+      message: string;
+      event?: Event | null;
+      registration?: Registration | null;
+      deadline?: string;
+    };
+
+type CancellationResult = {
+  ok: boolean;
+  message?: string;
+  event_id?: string | null;
+};
+
+type AdminRegistrationStatusResult = {
+  ok: boolean;
+  message?: string;
+  event_id?: string | null;
 };
 
 type EventFilters = {
@@ -153,6 +182,10 @@ const seedRegistrations: Registration[] = [
     gender: "private",
     skill_level: null,
     is_public: false,
+    cancel_code: "SAMPLE1234",
+    status: "active",
+    cancelled_at: null,
+    cancellation_reason: null,
     created_at: now
   }
 ];
@@ -235,6 +268,38 @@ function visibleStatus(event: Event): Event {
   if (event.current_participants >= event.max_participants) return { ...event, status: "full" };
   if (new Date(event.end_datetime).getTime() < Date.now()) return { ...event, status: "finished" };
   return event;
+}
+
+function generateCancelCode() {
+  return randomBytes(5).toString("hex").toUpperCase();
+}
+
+function registrationStatus(registration: Registration) {
+  return registration.status ?? "active";
+}
+
+function jstDateKey(value: string | Date) {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Tokyo"
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function cancelDeadlineAtJST(startDatetime: string) {
+  const eventDate = new Date(`${jstDateKey(startDatetime)}T13:00:00+09:00`);
+  return new Date(eventDate.getTime() - 24 * 60 * 60 * 1000);
+}
+
+export function formatCancelDeadlineJST(startDatetime: string) {
+  return `${formatDateTimeJST(cancelDeadlineAtJST(startDatetime).toISOString()).slice(0, 16)}まで`;
+}
+
+function canSelfCancel(event: Event) {
+  return Date.now() < cancelDeadlineAtJST(event.start_datetime).getTime();
 }
 
 function nextDate(date: string) {
@@ -382,7 +447,7 @@ export async function register(
 
     if (error) return { ok: false, message: error.message };
     const result = data as RegistrationResult;
-    return { ok: result.ok, message: result.message };
+    return { ok: result.ok, message: result.message, registration_id: result.registration_id, cancel_code: result.cancel_code };
   }
 
   const store = readLocalStore();
@@ -395,7 +460,19 @@ export async function register(
     return { ok: false, message: `残り${event.max_participants - event.current_participants}名まで申し込み可能です。` };
   }
 
-  store.registrations.push({ id: randomUUID(), event_id: eventId, ...input, display_name: displayName || null, created_at: new Date().toISOString() });
+  const registrationId = randomUUID();
+  const cancelCode = generateCancelCode();
+  store.registrations.push({
+    id: registrationId,
+    event_id: eventId,
+    ...input,
+    display_name: displayName || null,
+    cancel_code: cancelCode,
+    status: "active",
+    cancelled_at: null,
+    cancellation_reason: null,
+    created_at: new Date().toISOString()
+  });
   store.events = store.events.map((item) =>
     item.id === eventId
       ? {
@@ -407,7 +484,7 @@ export async function register(
       : item
   );
   writeLocalStore(store);
-  return { ok: true };
+  return { ok: true, registration_id: registrationId, cancel_code: cancelCode };
 }
 
 export async function listRegistrations(eventId: string) {
@@ -418,6 +495,164 @@ export async function listRegistrations(eventId: string) {
   }
 
   return readLocalStore().registrations.filter((item) => item.event_id === eventId);
+}
+
+async function getSupabaseRegistration(id: string) {
+  const { data, error } = await supabaseAdmin().from("registrations").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? ((data as Registration) ?? null) : null;
+}
+
+export async function getCancellationPreview(registrationId: string, cancelCode: string): Promise<CancellationPreview> {
+  const normalizedCode = cancelCode.trim().toUpperCase();
+  const registration = supabaseConfigured() ? await getSupabaseRegistration(registrationId) : readLocalStore().registrations.find((item) => item.id === registrationId) ?? null;
+  if (!registration) return { ok: false, message: "申込が見つかりません。" };
+  if ((registration.cancel_code ?? "").toUpperCase() !== normalizedCode) return { ok: false, message: "キャンセルコードが正しくありません。" };
+
+  const event = await getEvent(registration.event_id, { includeDeleted: true });
+  if (!event) return { ok: false, message: "活動が見つかりません。", registration };
+  const deadline = formatCancelDeadlineJST(event.start_datetime);
+
+  if (registrationStatus(registration) === "cancelled") {
+    return { ok: false, message: "この申込はすでにキャンセルされています。", event, registration, deadline };
+  }
+  if (event.status === "cancelled" || event.status === "finished") {
+    return { ok: false, message: "この活動は現在自助キャンセルできません。主催者または管理者までご連絡ください。", event, registration, deadline };
+  }
+  if (!canSelfCancel(event)) {
+    return {
+      ok: false,
+      message: "自助キャンセル期限を過ぎています。\nキャンセルをご希望の場合は、主催者または管理者までご連絡ください。",
+      event,
+      registration,
+      deadline
+    };
+  }
+
+  return { ok: true, event, registration, deadline };
+}
+
+export async function cancelRegistrationByCode(registrationId: string, cancelCode: string, reason: string): Promise<CancellationResult> {
+  const normalizedCode = cancelCode.trim().toUpperCase();
+
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin()
+      .rpc("cancel_registration", {
+        p_registration_id: registrationId,
+        p_cancel_code: normalizedCode,
+        p_reason: reason
+      })
+      .single();
+    if (error) return { ok: false, message: error.message };
+    return data as CancellationResult;
+  }
+
+  const preview = await getCancellationPreview(registrationId, normalizedCode);
+  if (!preview.ok) return { ok: false, message: preview.message, event_id: preview.event?.id ?? null };
+
+  const timestamp = new Date().toISOString();
+  const store = readLocalStore();
+  store.registrations = store.registrations.map((registration) =>
+    registration.id === registrationId
+      ? {
+          ...registration,
+          status: "cancelled",
+          cancelled_at: timestamp,
+          cancellation_reason: reason
+        }
+      : registration
+  );
+  store.events = store.events.map((event) =>
+    event.id === preview.registration.event_id
+      ? {
+          ...event,
+          current_participants: Math.max(event.current_participants - preview.registration.number_of_people, 0),
+          status: event.status === "full" && event.current_participants - preview.registration.number_of_people < event.max_participants ? "open" : event.status,
+          updated_at: timestamp
+        }
+      : event
+  );
+  writeLocalStore(store);
+  return { ok: true, event_id: preview.registration.event_id };
+}
+
+export async function setRegistrationStatusByAdmin(registrationId: string, status: RegistrationStatus): Promise<AdminRegistrationStatusResult> {
+  const timestamp = new Date().toISOString();
+
+  if (supabaseConfigured()) {
+    const { data: registrationData, error: registrationError } = await supabaseAdmin().from("registrations").select("*").eq("id", registrationId).maybeSingle();
+    if (registrationError) return { ok: false, message: registrationError.message };
+    if (!registrationData) return { ok: false, message: "申込が見つかりません。" };
+
+    const registration = registrationData as Registration;
+    const currentStatus = registrationStatus(registration);
+    if (currentStatus === status) return { ok: true, event_id: registration.event_id };
+
+    const event = await getEvent(registration.event_id, { includeDeleted: true });
+    if (!event) return { ok: false, message: "活動が見つかりません。", event_id: registration.event_id };
+
+    const delta = status === "cancelled" ? -registration.number_of_people : registration.number_of_people;
+    const nextCount = Math.max(event.current_participants + delta, 0);
+    if (status === "active" && nextCount > event.max_participants) {
+      return { ok: false, message: "定員を超えるため、有効に戻せません。", event_id: event.id };
+    }
+
+    const { error: updateRegistrationError } = await supabaseAdmin()
+      .from("registrations")
+      .update({
+        status,
+        cancelled_at: status === "cancelled" ? timestamp : null,
+        cancellation_reason: status === "cancelled" ? "管理者操作" : null
+      })
+      .eq("id", registration.id);
+    if (updateRegistrationError) return { ok: false, message: updateRegistrationError.message, event_id: event.id };
+
+    const nextEventStatus = event.status === "full" && nextCount < event.max_participants ? "open" : event.status === "open" && nextCount >= event.max_participants ? "full" : event.status;
+    const { error: updateEventError } = await supabaseAdmin()
+      .from("events")
+      .update({ current_participants: nextCount, status: nextEventStatus, updated_at: timestamp })
+      .eq("id", event.id);
+    if (updateEventError) return { ok: false, message: updateEventError.message, event_id: event.id };
+
+    return { ok: true, event_id: event.id };
+  }
+
+  const store = readLocalStore();
+  const registration = store.registrations.find((item) => item.id === registrationId);
+  if (!registration) return { ok: false, message: "申込が見つかりません。" };
+  const currentStatus = registrationStatus(registration);
+  if (currentStatus === status) return { ok: true, event_id: registration.event_id };
+  const event = store.events.find((item) => item.id === registration.event_id);
+  if (!event) return { ok: false, message: "活動が見つかりません。", event_id: registration.event_id };
+
+  const delta = status === "cancelled" ? -registration.number_of_people : registration.number_of_people;
+  const nextCount = Math.max(event.current_participants + delta, 0);
+  if (status === "active" && nextCount > event.max_participants) {
+    return { ok: false, message: "定員を超えるため、有効に戻せません。", event_id: event.id };
+  }
+
+  store.registrations = store.registrations.map((item) =>
+    item.id === registrationId
+      ? {
+          ...item,
+          status,
+          cancelled_at: status === "cancelled" ? timestamp : null,
+          cancellation_reason: status === "cancelled" ? "管理者操作" : null
+        }
+      : item
+  );
+  store.events = store.events.map((item) =>
+    item.id === event.id
+      ? {
+          ...item,
+          current_participants: nextCount,
+          status: item.status === "full" && nextCount < item.max_participants ? "open" : item.status === "open" && nextCount >= item.max_participants ? "full" : item.status,
+          updated_at: timestamp
+        }
+      : item
+  );
+  writeLocalStore(store);
+  return { ok: true, event_id: event.id };
 }
 
 export function csvEscape(value: unknown) {

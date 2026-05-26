@@ -89,6 +89,16 @@ supabase/20260527_add_public_registration_fields.sql
 
 この migration は `registrations.display_name`、`registrations.gender`、`registrations.skill_level`、`registrations.is_public` を追加します。既存の申し込みは `is_public = false`、`gender = private`、`skill_level = null` のままなので、過去の参加者名が公開されることはありません。
 
+申込者の自助キャンセル機能を追加する場合は、デプロイ前に SQL Editor で以下を実行してください。
+
+```text
+supabase/20260527_add_registration_cancellation.sql
+```
+
+この migration は `registrations.cancel_code`、`registrations.status`、`registrations.cancelled_at`、`registrations.cancellation_reason` を追加します。既存の申し込みは `status = active` になり、物理削除はされません。新しい申し込みでは、完了画面に `申込ID` と `キャンセルコード` が表示されます。
+
+自助キャンセルは活動開始日前日の 13:00（JST）までです。期限後、または活動が `キャンセル` / `終了` の場合は、ユーザー自身ではキャンセルできません。管理者は后台で参加者状況を確認し、必要に応じて手動対応してください。
+
 ## Supabase 権限整理
 
 現在のアプリは Next.js サーバー側だけが `SUPABASE_SERVICE_ROLE_KEY` を使って Supabase にアクセスします。ブラウザから直接 Supabase を操作しない構成です。

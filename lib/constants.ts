@@ -1,4 +1,4 @@
-import type { Area, ContactType, EventLevel, EventStatus, Gender, SkillLevel, SportType } from "@/lib/types";
+import type { Area, ContactType, EventLevel, EventStatus, Gender, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
 
 export const sports: Array<{ value: SportType; label: string; zh: string; color: string; border: string }> = [
   { value: "badminton", label: "バドミントン", zh: "羽毛球", color: "bg-emerald-100 text-emerald-800", border: "border-l-emerald-500" },
@@ -54,6 +54,11 @@ export const skillLevels: Array<{ value: SkillLevel; label: string }> = [
   { value: 5, label: "Lv.5 上級" }
 ];
 
+export const registrationStatuses: Array<{ value: RegistrationStatus; label: string }> = [
+  { value: "active", label: "有効" },
+  { value: "cancelled", label: "キャンセル済み" }
+];
+
 export const venueOptions = [
   "西SC（阿波座）スポーツセンター",
   "城東スポーツセンター",
@@ -94,6 +99,7 @@ export const levelName = (value: EventLevel) => levels.find((item) => item.value
 export const contactName = (value: ContactType) => contactTypes.find((item) => item.value === value) ?? contactTypes[0];
 export const genderName = (value?: string | null) => genders.find((item) => item.value === value)?.label ?? "非公開";
 export const skillLevelName = (value?: number | null) => skillLevels.find((item) => item.value === value)?.label ?? "未設定";
+export const registrationStatusName = (value?: string | null) => registrationStatuses.find((item) => item.value === value)?.label ?? "有効";
 export const venueShortName = (value: string) => {
   if (venueShortNames[value]) return venueShortNames[value];
   const fallback = value.replace(/スポーツセンター/g, "").slice(0, 4);

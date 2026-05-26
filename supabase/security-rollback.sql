@@ -30,4 +30,10 @@ begin
     grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to anon;
     grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to authenticated;
   end if;
+
+  if to_regprocedure('public.cancel_registration(text,text,text)') is not null then
+    grant execute on function public.cancel_registration(text, text, text) to public;
+    grant execute on function public.cancel_registration(text, text, text) to anon;
+    grant execute on function public.cancel_registration(text, text, text) to authenticated;
+  end if;
 end $$;

@@ -19,7 +19,22 @@ export async function GET(_request: Request, context: Context) {
   }
 
   const rows = [
-    ["event_title", "participant_name", "contact", "number_of_people", "note", "created_at_jst", "display_name", "gender", "skill_level", "is_public"],
+    [
+      "event_title",
+      "participant_name",
+      "contact",
+      "number_of_people",
+      "note",
+      "created_at_jst",
+      "display_name",
+      "gender",
+      "skill_level",
+      "is_public",
+      "status",
+      "cancelled_at_jst",
+      "cancellation_reason",
+      "cancel_code"
+    ],
     ...(await listRegistrations(id)).map((registration) => [
       event.title,
       registration.participant_name,
@@ -30,7 +45,11 @@ export async function GET(_request: Request, context: Context) {
       registration.display_name ?? "",
       registration.gender ?? "private",
       registration.skill_level ?? "",
-      registration.is_public ? "true" : "false"
+      registration.is_public ? "true" : "false",
+      registration.status ?? "active",
+      registration.cancelled_at ? formatDateTimeJST(registration.cancelled_at) : "",
+      registration.cancellation_reason ?? "",
+      registration.cancel_code ?? ""
     ])
   ];
 

@@ -35,6 +35,13 @@ begin
     revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from authenticated;
     grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to service_role;
   end if;
+
+  if to_regprocedure('public.cancel_registration(text,text,text)') is not null then
+    revoke all on function public.cancel_registration(text, text, text) from public;
+    revoke all on function public.cancel_registration(text, text, text) from anon;
+    revoke all on function public.cancel_registration(text, text, text) from authenticated;
+    grant execute on function public.cancel_registration(text, text, text) to service_role;
+  end if;
 end $$;
 
 -- Optional read-only browser policy for a future client-side Supabase version.

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { registerAction } from "@/app/actions";
 import { RegistrationPublicFields } from "@/components/registration-public-fields";
 import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName } from "@/lib/constants";
-import { formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
+import { formatCancelDeadlineJST, formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
 import type { Gender, Registration, SkillLevel } from "@/lib/types";
 
 type Params = Promise<{ id: string }>;
@@ -15,6 +15,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   const event = await getEvent(id);
   if (!event) notFound();
   const registrations = await listRegistrations(event.id);
+  const activeRegistrations = registrations.filter((registration) => (registration.status ?? "active") === "active");
 
   const sport = sportName(event.sport_type);
   const area = areaName(event.area);
@@ -22,9 +23,9 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   const canRegister = event.status === "open";
   const remaining = Math.max(event.max_participants - event.current_participants, 0);
   const action = registerAction.bind(null, event.id);
-  const genderStats = countGenders(registrations);
-  const skillStats = countSkillLevels(registrations);
-  const publicMembers = registrations.filter((registration) => registration.is_public && registration.display_name);
+  const genderStats = countGenders(activeRegistrations);
+  const skillStats = countSkillLevels(activeRegistrations);
+  const publicMembers = activeRegistrations.filter((registration) => registration.is_public && registration.display_name);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
@@ -99,6 +100,10 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
         <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:self-start">
           <h2 className="text-lg font-black text-slate-950">参加申し込み</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。連絡に必要な範囲だけ入力してください。</p>
+          <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs font-bold leading-5 text-slate-600">
+            キャンセルは活動前日の13:00まで、このページから手続きできます。目安: {formatCancelDeadlineJST(event.start_datetime)}
+            。それ以降のキャンセルは主催者または管理者までご連絡ください。
+          </p>
           <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs font-bold leading-5 text-amber-800">住所、勤務先、身分証番号などの敏感な個人情報は入力しないでください。</p>
           <p className="mt-2 rounded-md bg-teal-50 p-2 text-xs font-bold leading-5 text-teal-900">
             ニックネームは公開表示用です。本名や連絡先を書かないでください。連絡先・備考・本名は一般公開されません。性別は「非公開」を選べます。公開表示は任意です。
@@ -123,6 +128,9 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
             <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-800">この活動は現在申し込みできません。</p>
           )}
           <p className="mt-3 text-xs leading-5 text-slate-500">申し込み後は、主催者の連絡先で集合場所、持ち物、参加可否を確認してください。</p>
+          <Link className="mt-3 inline-flex text-xs font-bold text-teal-700 underline underline-offset-4" href="/cancel">
+            申込をキャンセルする
+          </Link>
         </aside>
       </section>
     </main>

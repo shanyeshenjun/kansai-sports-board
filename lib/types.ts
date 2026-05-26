@@ -5,6 +5,7 @@ export type EventLevel = "beginner_welcome" | "beginner" | "intermediate" | "adv
 export type ContactType = "wechat" | "line" | "instagram" | "email" | "phone";
 export type Gender = "male" | "female" | "private";
 export type SkillLevel = 1 | 2 | 3 | 4 | 5;
+export type RegistrationStatus = "active" | "cancelled";
 
 export type Event = {
   id: string;
@@ -41,5 +42,9 @@ export type Registration = {
   gender?: Gender | null;
   skill_level?: SkillLevel | null;
   is_public?: boolean | null;
+  cancel_code?: string | null;
+  status?: RegistrationStatus | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
   created_at: string;
 };

@@ -1,60 +1,38 @@
 create extension if not exists "pgcrypto";
 
-create table if not exists public.events (
-  id text primary key default gen_random_uuid()::text,
-  title text not null,
-  sport_type text not null check (sport_type in ('badminton', 'basketball', 'table_tennis', 'volleyball', 'futsal')),
-  area text not null check (area in ('osaka', 'kyoto', 'kobe', 'nara', 'hyogo', 'kansai_other')),
-  venue_name text not null,
-  address text not null,
-  start_datetime timestamptz not null,
-  end_datetime timestamptz not null,
-  fee integer not null default 0 check (fee >= 0),
-  max_participants integer not null check (max_participants > 0),
-  current_participants integer not null default 0 check (current_participants >= 0),
-  level text not null check (level in ('beginner_welcome', 'beginner', 'intermediate', 'advanced', 'anyone')),
-  organizer_name text not null,
-  organizer_contact_type text not null check (organizer_contact_type in ('wechat', 'line', 'instagram', 'email', 'phone')),
-  organizer_contact_value text not null,
-  description text not null default '',
-  notes text not null default '',
-  status text not null default 'open' check (status in ('open', 'full', 'finished', 'cancelled')),
-  deleted_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+alter table public.registrations
+add column if not exists cancel_code text,
+add column if not exists status text,
+add column if not exists cancelled_at timestamptz,
+add column if not exists cancellation_reason text;
 
-create table if not exists public.registrations (
-  id text primary key default gen_random_uuid()::text,
-  event_id text not null references public.events(id) on delete cascade,
-  participant_name text not null,
-  contact text not null,
-  number_of_people integer not null check (number_of_people > 0),
-  note text not null default '',
-  display_name text,
-  gender text not null default 'private' check (gender in ('male', 'female', 'private')),
-  skill_level integer check (skill_level between 1 and 5),
-  is_public boolean not null default false,
-  cancel_code text not null default upper(substr(encode(gen_random_bytes(5), 'hex'), 1, 10)),
-  status text not null default 'active' check (status in ('active', 'cancelled')),
-  cancelled_at timestamptz,
-  cancellation_reason text,
-  created_at timestamptz not null default now()
-);
+update public.registrations
+set
+  cancel_code = coalesce(nullif(cancel_code, ''), upper(substr(encode(gen_random_bytes(5), 'hex'), 1, 10))),
+  status = coalesce(nullif(status, ''), 'active')
+where cancel_code is null
+   or cancel_code = ''
+   or status is null
+   or status = '';
 
-create table if not exists public.admin_users (
-  id text primary key default gen_random_uuid()::text,
-  auth_user_id uuid unique,
-  display_name text not null,
-  created_at timestamptz not null default now()
-);
+alter table public.registrations
+drop constraint if exists registrations_status_check;
 
-create index if not exists events_start_datetime_idx on public.events(start_datetime);
-create index if not exists events_sport_type_idx on public.events(sport_type);
-create index if not exists events_area_idx on public.events(area);
-create index if not exists events_deleted_at_idx on public.events(deleted_at);
-create index if not exists registrations_event_id_idx on public.registrations(event_id);
+alter table public.registrations
+add constraint registrations_status_check
+check (status in ('active', 'cancelled'));
+
+alter table public.registrations
+alter column cancel_code set default upper(substr(encode(gen_random_bytes(5), 'hex'), 1, 10)),
+alter column cancel_code set not null,
+alter column status set default 'active',
+alter column status set not null;
+
 create index if not exists registrations_status_idx on public.registrations(status);
+
+drop function if exists public.register_for_event(text, text, text, integer, text);
+drop function if exists public.register_for_event(text, text, text, integer, text, text, text, boolean);
+drop function if exists public.register_for_event(text, text, text, integer, text, text, text, integer, boolean);
 
 create or replace function public.register_for_event(
   p_event_id text,
@@ -169,6 +147,8 @@ begin
 end;
 $$;
 
+drop function if exists public.cancel_registration(text, text, text);
+
 create or replace function public.cancel_registration(
   p_registration_id text,
   p_cancel_code text,
@@ -245,3 +225,13 @@ begin
   return query select true, 'キャンセルを受け付けました。', v_event.id;
 end;
 $$;
+
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from public;
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from anon;
+revoke all on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) from authenticated;
+grant execute on function public.register_for_event(text, text, text, integer, text, text, text, integer, boolean) to service_role;
+
+revoke all on function public.cancel_registration(text, text, text) from public;
+revoke all on function public.cancel_registration(text, text, text) from anon;
+revoke all on function public.cancel_registration(text, text, text) from authenticated;
+grant execute on function public.cancel_registration(text, text, text) to service_role;

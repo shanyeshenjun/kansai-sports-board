@@ -20,6 +20,7 @@ select
   r.participant_name,
   r.contact,
   r.number_of_people,
+  coalesce(r.status, 'active') as status,
   r.note,
   r.created_at
 from public.registrations r
@@ -40,11 +41,12 @@ where id in (select id from test_registration_ids);
 with deleted as (
   delete from public.registrations
   where id in (select id from test_registration_ids)
-  returning event_id, number_of_people
+  returning event_id, number_of_people, coalesce(status, 'active') as status
 ),
 totals as (
   select event_id, sum(number_of_people)::integer as removed_people
   from deleted
+  where status = 'active'
   group by event_id
 )
 update public.events e
