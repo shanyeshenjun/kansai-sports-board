@@ -6,10 +6,12 @@
 alter table public.events disable row level security;
 alter table public.registrations disable row level security;
 alter table public.admin_users disable row level security;
+alter table public.organizers disable row level security;
 
 grant select, insert, update, delete on table public.events to anon, authenticated;
 grant select, insert, update, delete on table public.registrations to anon, authenticated;
 grant select, insert, update, delete on table public.admin_users to anon, authenticated;
+grant select, insert, update, delete on table public.organizers to anon, authenticated;
 
 do $$
 begin

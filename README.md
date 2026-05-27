@@ -99,6 +99,21 @@ supabase/20260527_add_registration_cancellation.sql
 
 自助キャンセルは活動開始日前日の 13:00（JST）までです。期限後、または活動が `キャンセル` / `終了` の場合は、ユーザー自身ではキャンセルできません。管理者は后台で参加者状況を確認し、必要に応じて手動対応してください。
 
+招待制の主催者后台を追加する場合は、デプロイ前に SQL Editor で以下を実行してください。
+
+```text
+supabase/20260527_add_invited_organizers.sql
+```
+
+この migration は `organizers` テーブルを作成し、`events.organizer_id` を追加します。既存の活動は `organizer_id = null` のままなので、これまで通り管理者だけが全体管理できます。主催者パスワードはアプリ側で scrypt hash にして保存し、平文では保存しません。
+
+主催者機能の確認順序:
+1. `/admin/organizers` で主催者を作成
+2. `/organizer/login` でログイン
+3. `/organizer` で自分の活動だけが見えることを確認
+4. 主催者で活動作成・編集・参加者一覧・CSV を確認
+5. 別主催者の活動URLを直接開いても管理できないことを確認
+
 ## Supabase 権限整理
 
 現在のアプリは Next.js サーバー側だけが `SUPABASE_SERVICE_ROLE_KEY` を使って Supabase にアクセスします。ブラウザから直接 Supabase を操作しない構成です。

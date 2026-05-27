@@ -6,6 +6,7 @@ export type ContactType = "wechat" | "line" | "instagram" | "email" | "phone";
 export type Gender = "male" | "female" | "private";
 export type SkillLevel = 1 | 2 | 3 | 4 | 5;
 export type RegistrationStatus = "active" | "cancelled";
+export type OrganizerStatus = "active" | "disabled";
 
 export type Event = {
   id: string;
@@ -26,9 +27,21 @@ export type Event = {
   description: string;
   notes: string;
   status: EventStatus;
+  organizer_id?: string | null;
   deleted_at?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type Organizer = {
+  id: string;
+  login_id: string;
+  display_name: string;
+  password_hash: string;
+  status: OrganizerStatus;
+  created_at: string;
+  last_login_at?: string | null;
+  admin_note?: string | null;
 };
 
 export type Registration = {

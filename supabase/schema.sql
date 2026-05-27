@@ -1,5 +1,16 @@
 create extension if not exists "pgcrypto";
 
+create table if not exists public.organizers (
+  id uuid primary key default gen_random_uuid(),
+  login_id text unique not null,
+  display_name text not null,
+  password_hash text not null,
+  status text not null default 'active' check (status in ('active', 'disabled')),
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz,
+  admin_note text
+);
+
 create table if not exists public.events (
   id text primary key default gen_random_uuid()::text,
   title text not null,
@@ -19,6 +30,7 @@ create table if not exists public.events (
   description text not null default '',
   notes text not null default '',
   status text not null default 'open' check (status in ('open', 'full', 'finished', 'cancelled')),
+  organizer_id uuid references public.organizers(id) on delete set null,
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -53,8 +65,10 @@ create index if not exists events_start_datetime_idx on public.events(start_date
 create index if not exists events_sport_type_idx on public.events(sport_type);
 create index if not exists events_area_idx on public.events(area);
 create index if not exists events_deleted_at_idx on public.events(deleted_at);
+create index if not exists events_organizer_id_idx on public.events(organizer_id);
 create index if not exists registrations_event_id_idx on public.registrations(event_id);
 create index if not exists registrations_status_idx on public.registrations(status);
+create index if not exists organizers_status_idx on public.organizers(status);
 
 create or replace function public.register_for_event(
   p_event_id text,

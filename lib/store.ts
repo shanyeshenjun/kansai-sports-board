@@ -1,12 +1,14 @@
-import { randomBytes, randomUUID } from "crypto";
+import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from "crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
+import { promisify } from "util";
 import { createClient } from "@supabase/supabase-js";
-import type { Area, Event, EventStatus, Gender, Registration, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
+import type { Area, Event, EventStatus, Gender, Organizer, OrganizerStatus, Registration, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
 
 type Store = {
   events: Event[];
   registrations: Registration[];
+  organizers: Organizer[];
 };
 
 type RegistrationResult = {
@@ -50,6 +52,15 @@ type EventFilters = {
   onlyOpen?: boolean;
   includeDeleted?: boolean;
 };
+
+type OrganizerInput = {
+  login_id: string;
+  display_name: string;
+  password: string;
+  admin_note: string;
+};
+
+const scrypt = promisify(scryptCallback);
 
 const dataDir = path.join(process.cwd(), ".data");
 const dataFile = path.join(dataDir, "mock-store.json");
@@ -190,6 +201,8 @@ const seedRegistrations: Registration[] = [
   }
 ];
 
+const seedOrganizers: Organizer[] = [];
+
 function supabaseConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -212,12 +225,13 @@ function supabaseAdmin() {
 function cloneStore(store: Store): Store {
   return {
     events: store.events.map((item) => ({ ...item })),
-    registrations: store.registrations.map((item) => ({ ...item }))
+    registrations: store.registrations.map((item) => ({ ...item })),
+    organizers: (store.organizers ?? []).map((item) => ({ ...item }))
   };
 }
 
 function seedStore(): Store {
-  return cloneStore({ events: seedEvents, registrations: seedRegistrations });
+  return cloneStore({ events: seedEvents, registrations: seedRegistrations, organizers: seedOrganizers });
 }
 
 function memoryStore(): Store {
@@ -238,7 +252,8 @@ function readLocalStore(): Store {
       writeLocalStore(store);
       return store;
     }
-    return JSON.parse(readFileSync(dataFile, "utf8")) as Store;
+    const store = JSON.parse(readFileSync(dataFile, "utf8")) as Store;
+    return { events: store.events ?? [], registrations: store.registrations ?? [], organizers: store.organizers ?? [] };
   } catch {
     return memoryStore();
   }
@@ -262,16 +277,34 @@ function isDeleted(event: Event) {
   return Boolean(event.deleted_at);
 }
 
+function isEventEnded(event: Event) {
+  return new Date(event.end_datetime).getTime() < Date.now();
+}
+
 function visibleStatus(event: Event): Event {
   if (isDeleted(event)) return event;
-  if (event.status === "cancelled" || event.status === "finished" || event.status === "full") return event;
-  if (event.current_participants >= event.max_participants) return { ...event, status: "full" };
-  if (new Date(event.end_datetime).getTime() < Date.now()) return { ...event, status: "finished" };
+  if (event.status === "cancelled") return event;
+  if (event.status === "finished" || isEventEnded(event)) return { ...event, status: "finished" };
+  if (event.status === "full" || event.current_participants >= event.max_participants) return { ...event, status: "full" };
   return event;
 }
 
 function generateCancelCode() {
   return randomBytes(5).toString("hex").toUpperCase();
+}
+
+export async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derived = (await scrypt(password, salt, 64)) as Buffer;
+  return `scrypt$${salt}$${derived.toString("hex")}`;
+}
+
+export async function verifyPassword(password: string, passwordHash: string) {
+  const [algorithm, salt, hash] = passwordHash.split("$");
+  if (algorithm !== "scrypt" || !salt || !hash) return false;
+  const stored = Buffer.from(hash, "hex");
+  const derived = (await scrypt(password, salt, stored.length)) as Buffer;
+  return stored.length === derived.length && timingSafeEqual(stored, derived);
 }
 
 function registrationStatus(registration: Registration) {
@@ -340,6 +373,11 @@ export async function listEvents(filters?: EventFilters) {
   return supabaseConfigured() ? listSupabaseEvents(filters) : listLocalEvents(filters);
 }
 
+export async function listOrganizerEvents(organizerId: string, filters?: EventFilters) {
+  const events = await listEvents({ ...filters, includeDeleted: filters?.includeDeleted ?? true });
+  return events.filter((event) => event.organizer_id === organizerId);
+}
+
 export async function getEvent(id: string, options?: { includeDeleted?: boolean }) {
   if (supabaseConfigured()) {
     let query = supabaseAdmin().from("events").select("*").eq("id", id);
@@ -358,11 +396,20 @@ export async function getAdminEvent(id: string) {
   return getEvent(id, { includeDeleted: true });
 }
 
-export async function saveEvent(input: Omit<Event, "id" | "created_at" | "updated_at">, id?: string) {
+export async function getOrganizerEvent(id: string, organizerId: string) {
+  const event = await getEvent(id, { includeDeleted: true });
+  return event?.organizer_id === organizerId ? event : null;
+}
+
+export async function saveEvent(input: Omit<Event, "id" | "created_at" | "updated_at">, id?: string, ownerOrganizerId?: string) {
   const timestamp = new Date().toISOString();
 
   if (supabaseConfigured()) {
     if (id) {
+      if (ownerOrganizerId) {
+        const event = await getOrganizerEvent(id, ownerOrganizerId);
+        if (!event) throw new Error("この活動を編集する権限がありません。");
+      }
       const { error } = await supabaseAdmin()
         .from("events")
         .update({ ...input, updated_at: timestamp })
@@ -374,46 +421,63 @@ export async function saveEvent(input: Omit<Event, "id" | "created_at" | "update
     const eventId = randomUUID();
     const { error } = await supabaseAdmin()
       .from("events")
-      .insert({ ...input, id: eventId, created_at: timestamp, updated_at: timestamp });
+      .insert({ ...input, id: eventId, organizer_id: ownerOrganizerId ?? input.organizer_id ?? null, created_at: timestamp, updated_at: timestamp });
     if (error) throw new Error(error.message);
     return eventId;
   }
 
   const store = readLocalStore();
   if (id) {
+    if (ownerOrganizerId && store.events.find((event) => event.id === id)?.organizer_id !== ownerOrganizerId) {
+      throw new Error("この活動を編集する権限がありません。");
+    }
     store.events = store.events.map((event) => (event.id === id ? { ...event, ...input, updated_at: timestamp } : event));
     writeLocalStore(store);
     return id;
   }
 
   const eventId = randomUUID();
-  store.events.unshift({ ...input, id: eventId, created_at: timestamp, updated_at: timestamp });
+  store.events.unshift({ ...input, id: eventId, organizer_id: ownerOrganizerId ?? input.organizer_id ?? null, created_at: timestamp, updated_at: timestamp });
   writeLocalStore(store);
   return eventId;
 }
 
-export async function setEventStatus(id: string, status: EventStatus) {
+export async function setEventStatus(id: string, status: EventStatus, ownerOrganizerId?: string) {
   if (supabaseConfigured()) {
+    if (ownerOrganizerId) {
+      const event = await getOrganizerEvent(id, ownerOrganizerId);
+      if (!event) throw new Error("この活動を変更する権限がありません。");
+    }
     const { error } = await supabaseAdmin().from("events").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
     if (error) throw new Error(error.message);
     return;
   }
 
   const store = readLocalStore();
+  if (ownerOrganizerId && store.events.find((event) => event.id === id)?.organizer_id !== ownerOrganizerId) {
+    throw new Error("この活動を変更する権限がありません。");
+  }
   store.events = store.events.map((event) => (event.id === id ? { ...event, status, updated_at: new Date().toISOString() } : event));
   writeLocalStore(store);
 }
 
-export async function softDeleteEvent(id: string) {
+export async function softDeleteEvent(id: string, ownerOrganizerId?: string) {
   const timestamp = new Date().toISOString();
 
   if (supabaseConfigured()) {
+    if (ownerOrganizerId) {
+      const event = await getOrganizerEvent(id, ownerOrganizerId);
+      if (!event) throw new Error("この活動を削除する権限がありません。");
+    }
     const { error } = await supabaseAdmin().from("events").update({ deleted_at: timestamp, updated_at: timestamp }).eq("id", id);
     if (error) throw new Error(error.message);
     return;
   }
 
   const store = readLocalStore();
+  if (ownerOrganizerId && store.events.find((event) => event.id === id)?.organizer_id !== ownerOrganizerId) {
+    throw new Error("この活動を削除する権限がありません。");
+  }
   store.events = store.events.map((event) => (event.id === id ? { ...event, deleted_at: timestamp, updated_at: timestamp } : event));
   writeLocalStore(store);
 }
@@ -495,6 +559,111 @@ export async function listRegistrations(eventId: string) {
   }
 
   return readLocalStore().registrations.filter((item) => item.event_id === eventId);
+}
+
+export async function listOrganizers() {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("organizers").select("*").order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Organizer[];
+  }
+
+  return readLocalStore().organizers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export async function getOrganizer(id: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("organizers").select("*").eq("id", id).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? (data as Organizer) : null;
+  }
+
+  return readLocalStore().organizers.find((organizer) => organizer.id === id) ?? null;
+}
+
+export async function getOrganizerByLoginId(loginId: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("organizers").select("*").eq("login_id", loginId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? (data as Organizer) : null;
+  }
+
+  return readLocalStore().organizers.find((organizer) => organizer.login_id === loginId) ?? null;
+}
+
+export async function createOrganizer(input: OrganizerInput) {
+  const timestamp = new Date().toISOString();
+  const loginId = input.login_id.trim();
+  if (!loginId || !input.display_name.trim() || !input.password) throw new Error("必須項目を入力してください。");
+  const passwordHash = await hashPassword(input.password);
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("organizers").insert({
+      id: randomUUID(),
+      login_id: loginId,
+      display_name: input.display_name.trim(),
+      password_hash: passwordHash,
+      status: "active",
+      admin_note: input.admin_note.trim() || null,
+      created_at: timestamp
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
+  if (store.organizers.some((organizer) => organizer.login_id === loginId)) throw new Error("このログインIDはすでに使われています。");
+  store.organizers.unshift({
+    id: randomUUID(),
+    login_id: loginId,
+    display_name: input.display_name.trim(),
+    password_hash: passwordHash,
+    status: "active",
+    admin_note: input.admin_note.trim() || null,
+    last_login_at: null,
+    created_at: timestamp
+  });
+  writeLocalStore(store);
+}
+
+export async function setOrganizerStatus(id: string, status: OrganizerStatus) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("organizers").update({ status }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
+  store.organizers = store.organizers.map((organizer) => (organizer.id === id ? { ...organizer, status } : organizer));
+  writeLocalStore(store);
+}
+
+export async function resetOrganizerPassword(id: string, password: string) {
+  if (!password) throw new Error("新しいパスワードを入力してください。");
+  const passwordHash = await hashPassword(password);
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("organizers").update({ password_hash: passwordHash }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
+  store.organizers = store.organizers.map((organizer) => (organizer.id === id ? { ...organizer, password_hash: passwordHash } : organizer));
+  writeLocalStore(store);
+}
+
+export async function markOrganizerLogin(id: string) {
+  const timestamp = new Date().toISOString();
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("organizers").update({ last_login_at: timestamp }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const store = readLocalStore();
+  store.organizers = store.organizers.map((organizer) => (organizer.id === id ? { ...organizer, last_login_at: timestamp } : organizer));
+  writeLocalStore(store);
 }
 
 async function getSupabaseRegistration(id: string) {

@@ -19,26 +19,35 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   };
   const events = await listEvents(filters);
   const openCount = events.filter((event) => event.status === "open").length;
+  const sportTags = ["バドミントン", "バスケ", "卓球", "バレー", "フットサル"];
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-5">
-      <section className="mb-4 rounded-lg border border-line bg-white p-4 shadow-sm">
+      <section className="mb-4 overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-br from-white via-teal-50 to-sky-50 p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-black uppercase tracking-wide text-teal-700">Kansai Sports Board</p>
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">テスト版</span>
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800 ring-1 ring-amber-200">テスト版</span>
         </div>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-black leading-tight text-slate-950">関西のスポーツ活動を探す</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-600">大阪・京都・神戸を中心に、参加しやすいスポーツ活動を掲載しています。</p>
+            <h1 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">関西スポーツ掲示板</h1>
+            <p className="mt-1 text-sm font-bold text-teal-900">Kansai Sports Board</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">大阪・京都・神戸を中心に、参加しやすいスポーツ活動を掲載しています。</p>
             <p className="mt-1 text-xs text-slate-500">現在は運用テスト中です。掲載内容は主催者に確認してから参加してください。</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {sportTags.map((tag) => (
+                <span className="rounded-full border border-white/80 bg-white/75 px-3 py-1 text-xs font-black text-slate-700 shadow-sm" key={tag}>
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center sm:w-48">
-            <div className="rounded-md bg-slate-100 px-3 py-2">
+            <div className="rounded-lg border border-white/80 bg-white/80 px-3 py-2 shadow-sm">
               <div className="text-lg font-black">{events.length}</div>
               <div className="text-xs font-bold text-slate-500">表示中</div>
             </div>
-            <div className="rounded-md bg-teal-50 px-3 py-2 text-teal-900">
+            <div className="rounded-lg border border-teal-100 bg-teal-600 px-3 py-2 text-white shadow-sm">
               <div className="text-lg font-black">{openCount}</div>
               <div className="text-xs font-bold">受付中</div>
             </div>
@@ -46,7 +55,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         </div>
       </section>
 
-      <form className="mb-5 grid gap-3 rounded-lg border border-line bg-white p-3 shadow-sm md:grid-cols-[1fr_1fr_1fr_auto]">
+      <form className="mb-5 grid gap-3 rounded-xl border border-line bg-white/95 p-3 shadow-sm md:grid-cols-[1fr_1fr_1fr_auto]">
         <select className="touch-target rounded-md border border-line bg-white px-3 text-sm font-bold" name="sport_type" defaultValue={filters.sport_type}>
           <option value="">すべての種目</option>
           {sports.map((item) => (

@@ -11,8 +11,15 @@ const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const markerColors: Record<EventStatus, string> = {
   open: "bg-teal-600",
   full: "bg-amber-500",
-  finished: "bg-zinc-400",
-  cancelled: "bg-red-400"
+  finished: "bg-slate-300",
+  cancelled: "bg-red-300"
+};
+
+const summaryStyles: Record<EventStatus, string> = {
+  open: "border-teal-100 bg-teal-50 text-teal-900 hover:border-teal-300 hover:text-teal-800",
+  full: "border-amber-100 bg-amber-50 text-amber-900 hover:border-amber-300",
+  finished: "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300",
+  cancelled: "border-red-100 bg-red-50 text-red-700 hover:border-red-200"
 };
 
 function jstParts(value: string | Date) {
@@ -158,7 +165,7 @@ export function EventCalendar({ events }: { events: Event[] }) {
         {selectedEvents.length ? (
           <div className="mt-2 grid gap-2">
             {selectedEvents.map((event) => (
-              <Link key={event.id} className="rounded-md border border-line bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:border-teal-300 hover:text-teal-800" href={`/events/${event.id}`}>
+              <Link key={event.id} className={`rounded-md border px-3 py-2 text-sm font-bold ${summaryStyles[event.status]}`} href={`/events/${event.id}`}>
                 <span className="block truncate">
                   {venueShortName(event.venue_name)} {event.startTime}-{event.endTime}
                 </span>

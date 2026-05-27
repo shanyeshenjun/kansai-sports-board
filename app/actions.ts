@@ -1,14 +1,52 @@
 "use server";
 
+import { createHmac, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { cancelRegistrationByCode, getCancellationPreview, parseEventForm, register, saveEvent, setEventStatus, setRegistrationStatusByAdmin, softDeleteEvent } from "@/lib/store";
+import {
+  cancelRegistrationByCode,
+  createOrganizer,
+  getCancellationPreview,
+  getOrganizer,
+  getOrganizerByLoginId,
+  markOrganizerLogin,
+  parseEventForm,
+  register,
+  resetOrganizerPassword,
+  saveEvent,
+  setEventStatus,
+  setOrganizerStatus,
+  setRegistrationStatusByAdmin,
+  softDeleteEvent,
+  verifyPassword
+} from "@/lib/store";
 import type { EventStatus, Gender, RegistrationStatus, SkillLevel } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
 const lastRegistrationCookie = "ksb_last_registration";
 const cancellationRequestCookie = "ksb_cancel_request";
+const organizerSessionCookie = "ksb_organizer";
+
+function sessionSecret() {
+  return process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || defaultAdminPassword;
+}
+
+function signOrganizerSession(id: string) {
+  const signature = createHmac("sha256", sessionSecret()).update(id).digest("hex");
+  return `${id}.${signature}`;
+}
+
+function verifyOrganizerSession(value?: string) {
+  if (!value) return null;
+  const [id, signature] = value.split(".");
+  if (!id || !signature) return null;
+  const expected = createHmac("sha256", sessionSecret()).update(id).digest("hex");
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) return null;
+  return timingSafeEqual(actualBuffer, expectedBuffer) ? id : null;
+}
 
 export async function isAdmin() {
   const cookieStore = await cookies();
@@ -39,6 +77,21 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete("ksb_admin");
   redirect("/");
+}
+
+export async function currentOrganizer() {
+  const cookieStore = await cookies();
+  const id = verifyOrganizerSession(cookieStore.get(organizerSessionCookie)?.value);
+  if (!id) return null;
+  const organizer = await getOrganizer(id);
+  if (!organizer || organizer.status !== "active") return null;
+  return organizer;
+}
+
+export async function requireOrganizer() {
+  const organizer = await currentOrganizer();
+  if (!organizer) redirect("/organizer/login");
+  return organizer;
 }
 
 export async function createEventAction(formData: FormData) {
@@ -114,6 +167,127 @@ export async function changeRegistrationStatusAction(formData: FormData) {
     redirect(`/admin/events/${eventId || result.event_id}/registrations?error=${encodeURIComponent(result.message ?? "更新できませんでした。")}`);
   }
   redirect(`/admin/events/${eventId || result.event_id}/registrations`);
+}
+
+export async function createOrganizerAction(formData: FormData) {
+  await requireAdmin();
+  try {
+    await createOrganizer({
+      login_id: String(formData.get("login_id") ?? ""),
+      display_name: String(formData.get("display_name") ?? ""),
+      password: String(formData.get("password") ?? ""),
+      admin_note: String(formData.get("admin_note") ?? "")
+    });
+  } catch (error) {
+    redirect(`/admin/organizers?error=${encodeURIComponent(error instanceof Error ? error.message : "作成できませんでした。")}`);
+  }
+  revalidatePath("/admin/organizers");
+  redirect("/admin/organizers");
+}
+
+export async function changeOrganizerStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("organizer_id") ?? "");
+  const status = String(formData.get("status") ?? "active") === "disabled" ? "disabled" : "active";
+  await setOrganizerStatus(id, status);
+  revalidatePath("/admin/organizers");
+  redirect("/admin/organizers");
+}
+
+export async function resetOrganizerPasswordAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("organizer_id") ?? "");
+  const password = String(formData.get("password") ?? "");
+  try {
+    await resetOrganizerPassword(id, password);
+  } catch (error) {
+    redirect(`/admin/organizers?error=${encodeURIComponent(error instanceof Error ? error.message : "更新できませんでした。")}`);
+  }
+  revalidatePath("/admin/organizers");
+  redirect("/admin/organizers?reset=1");
+}
+
+export async function organizerLoginAction(formData: FormData) {
+  const loginId = String(formData.get("login_id") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const organizer = await getOrganizerByLoginId(loginId);
+  if (!organizer || organizer.status !== "active" || !(await verifyPassword(password, organizer.password_hash))) {
+    redirect("/organizer/login?error=1");
+  }
+  await markOrganizerLogin(organizer.id);
+  const cookieStore = await cookies();
+  cookieStore.set(organizerSessionCookie, signOrganizerSession(organizer.id), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12
+  });
+  redirect("/organizer");
+}
+
+export async function organizerLogoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete(organizerSessionCookie);
+  redirect("/organizer/login");
+}
+
+export async function createOrganizerEventAction(formData: FormData) {
+  const organizer = await requireOrganizer();
+  const id = await saveEvent(parseEventForm(formData), undefined, organizer.id);
+  revalidatePath("/");
+  revalidatePath("/organizer");
+  redirect(`/organizer/events/${id}/edit`);
+}
+
+export async function updateOrganizerEventAction(id: string, formData: FormData) {
+  const organizer = await requireOrganizer();
+  await saveEvent(parseEventForm(formData), id, organizer.id);
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/organizer");
+  redirect("/organizer");
+}
+
+export async function changeOrganizerEventStatusAction(formData: FormData) {
+  const organizer = await requireOrganizer();
+  const id = String(formData.get("event_id") ?? "");
+  const status = String(formData.get("status") ?? "open") as EventStatus;
+  await setEventStatus(id, status, organizer.id);
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/organizer");
+  redirect("/organizer");
+}
+
+export async function finishOrganizerEventAction(formData: FormData) {
+  const organizer = await requireOrganizer();
+  const id = String(formData.get("event_id") ?? "");
+  await setEventStatus(id, "finished", organizer.id);
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/organizer");
+  redirect("/organizer");
+}
+
+export async function cancelOrganizerEventAction(formData: FormData) {
+  const organizer = await requireOrganizer();
+  const id = String(formData.get("event_id") ?? "");
+  await setEventStatus(id, "cancelled", organizer.id);
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/organizer");
+  redirect("/organizer");
+}
+
+export async function deleteOrganizerEventAction(formData: FormData) {
+  const organizer = await requireOrganizer();
+  const id = String(formData.get("event_id") ?? "");
+  await softDeleteEvent(id, organizer.id);
+  revalidatePath("/");
+  revalidatePath(`/events/${id}`);
+  revalidatePath("/organizer");
+  redirect("/organizer");
 }
 
 export async function registerAction(eventId: string, formData: FormData) {

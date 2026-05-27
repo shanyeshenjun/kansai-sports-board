@@ -6,11 +6,13 @@
 alter table public.events enable row level security;
 alter table public.registrations enable row level security;
 alter table public.admin_users enable row level security;
+alter table public.organizers enable row level security;
 
 -- Remove direct browser/client access to operational tables.
 revoke all on table public.events from anon, authenticated;
 revoke all on table public.registrations from anon, authenticated;
 revoke all on table public.admin_users from anon, authenticated;
+revoke all on table public.organizers from anon, authenticated;
 
 -- Do not allow public clients to execute the registration function directly.
 do $$

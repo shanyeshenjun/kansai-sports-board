@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { registerAction } from "@/app/actions";
 import { RegistrationPublicFields } from "@/components/registration-public-fields";
-import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName } from "@/lib/constants";
+import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName, venueMapUrl } from "@/lib/constants";
 import { formatCancelDeadlineJST, formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
 import type { Gender, Registration, SkillLevel } from "@/lib/types";
+import type { ReactNode } from "react";
 
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -29,15 +30,16 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
-      <Link className="text-sm font-bold text-teal-700" href="/">
+      <Link className="inline-flex rounded-full bg-white/80 px-3 py-1.5 text-sm font-bold text-teal-700 shadow-sm ring-1 ring-line" href="/">
         一覧へ戻る
       </Link>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
-          <article className={`rounded-lg border border-line bg-white p-4 shadow-sm ${event.status !== "open" ? "opacity-90" : ""}`}>
+          <article className={`overflow-hidden rounded-xl border border-line bg-white shadow-sm ${event.status !== "open" ? "opacity-90" : ""}`}>
+            <div className="bg-gradient-to-br from-white via-teal-50 to-sky-50 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${sport.color}`}>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-black ring-1 ring-black/5 ${sport.color}`}>
                 {sport.label}
                 <span className="ml-1 text-[11px] font-semibold opacity-80">{sport.zh}</span>
               </span>
@@ -45,13 +47,30 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
               <span className={`rounded-full px-2.5 py-1 text-xs font-black ${status.color}`}>{status.label}</span>
             </div>
             <h1 className="mt-3 text-2xl font-black leading-tight text-slate-950">{event.title}</h1>
-            <div className={`mt-4 rounded-md border px-3 py-2 text-sm font-black ${status.panel}`}>
+            <div className={`mt-4 rounded-lg border px-3 py-2 text-sm font-black ${status.panel}`}>
               {canRegister ? `現在受付中です。残り${remaining}名まで申し込みできます。` : `この活動は「${status.label}」です。`}
             </div>
-            <dl className="mt-4 grid gap-2 text-sm">
+            </div>
+
+            <dl className="grid gap-2 p-4 text-sm sm:grid-cols-2">
               <Info label="日時" value={`${formatDate(event.start_datetime)} ${formatTime(event.start_datetime)}-${formatTime(event.end_datetime)}`} />
               <Info label="エリア" value={area.label} />
-              <Info label="会場" value={event.venue_name} />
+              <Info
+                label="会場"
+                value={
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>{event.venue_name}</span>
+                    <a
+                      className="inline-flex rounded-full bg-teal-50 px-2.5 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-100"
+                      href={venueMapUrl(event.venue_name, event.address)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      地図を見る
+                    </a>
+                  </span>
+                }
+              />
               <Info label="住所" value={event.address} />
               <Info label="費用" value={yen(event.fee)} />
               <Info label="人数" value={`${event.current_participants}/${event.max_participants}名`} />
@@ -61,30 +80,38 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
             </dl>
           </article>
 
-          <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
+          <article className="rounded-xl border border-line bg-white p-4 shadow-sm">
             <h2 className="font-black text-slate-950">活動内容</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{event.description}</p>
             {event.notes ? <p className="mt-3 rounded-md bg-slate-100 p-3 text-sm leading-6 text-slate-700">注意事項: {event.notes}</p> : null}
           </article>
 
-          <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
+          <article className="rounded-xl border border-line bg-white p-4 shadow-sm">
             <h2 className="font-black text-slate-950">参加予定メンバー</h2>
-            <p className="mt-2 rounded-md bg-slate-50 p-3 text-sm font-bold text-slate-700">
-              男性 {genderStats.male}人 / 女性 {genderStats.female}人 / 非公開 {genderStats.private}人
-            </p>
-            <div className="mt-2 grid gap-1 rounded-md bg-slate-50 p-3 text-sm font-bold text-slate-700">
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <Stat label="男性" value={`${genderStats.male}人`} />
+              <Stat label="女性" value={`${genderStats.female}人`} />
+              <Stat label="非公開" value={`${genderStats.private}人`} />
+            </div>
+            <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700 sm:grid-cols-2">
               {skillLevels.map((skill) => (
-                <p key={skill.value}>
-                  {skill.label}: {skillStats[skill.value]}人
-                </p>
+                <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-line" key={skill.value}>
+                  <span>{skill.label}</span>
+                  <span className="font-black text-slate-950">{skillStats[skill.value]}人</span>
+                </div>
               ))}
-              {skillStats.unset ? <p>未設定: {skillStats.unset}人</p> : null}
+              {skillStats.unset ? (
+                <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-line">
+                  <span>未設定</span>
+                  <span className="font-black text-slate-950">{skillStats.unset}人</span>
+                </div>
+              ) : null}
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-500">性別人数は匿名の集計です。公開表示を選んでいない参加者のニックネーム、本名、連絡先、備考は表示されません。</p>
             {publicMembers.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {publicMembers.map((member) => (
-                  <span className="rounded-full border border-line bg-white px-3 py-1.5 text-sm font-bold text-slate-800" key={member.id}>
+                  <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-sm font-bold text-slate-800" key={member.id}>
                     {member.display_name}
                     <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{genderName(member.gender)}</span>
                     <span className="ml-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs text-teal-800">{skillLevelName(member.skill_level)}</span>
@@ -97,7 +124,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
           </article>
         </div>
 
-        <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:self-start">
+        <aside className="rounded-xl border border-line bg-white p-4 shadow-sm lg:self-start">
           <h2 className="text-lg font-black text-slate-950">参加申し込み</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。連絡に必要な範囲だけ入力してください。</p>
           <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs font-bold leading-5 text-slate-600">
@@ -128,7 +155,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
             <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-800">この活動は現在申し込みできません。</p>
           )}
           <p className="mt-3 text-xs leading-5 text-slate-500">申し込み後は、主催者の連絡先で集合場所、持ち物、参加可否を確認してください。</p>
-          <Link className="mt-3 inline-flex text-xs font-bold text-teal-700 underline underline-offset-4" href="/cancel">
+          <Link className="touch-target mt-3 flex items-center justify-center rounded-lg border border-line px-4 py-3 text-sm font-black text-slate-700" href="/cancel">
             申込をキャンセルする
           </Link>
         </aside>
@@ -137,11 +164,20 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="grid grid-cols-[84px_1fr] gap-3 border-b border-line py-2 last:border-b-0">
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
       <dt className="font-bold text-slate-500">{label}</dt>
-      <dd className="font-bold text-slate-900">{value}</dd>
+      <dd className="mt-1 font-black text-slate-900">{value}</dd>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-3 ring-1 ring-line">
+      <div className="text-xs font-bold text-slate-500">{label}</div>
+      <div className="mt-1 text-lg font-black text-slate-950">{value}</div>
     </div>
   );
 }

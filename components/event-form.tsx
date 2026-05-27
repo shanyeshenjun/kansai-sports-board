@@ -4,7 +4,7 @@ import type { Event } from "@/lib/types";
 import { TimeSlotFields } from "@/components/time-slot-fields";
 import { VenueSelectFields } from "@/components/venue-select-fields";
 
-export function EventForm({ event, action }: { event?: Event; action: (formData: FormData) => Promise<void> }) {
+export function EventForm({ event, action, showCurrentParticipants = true }: { event?: Event; action: (formData: FormData) => Promise<void>; showCurrentParticipants?: boolean }) {
   return (
     <form action={action} className="grid gap-4">
       <Field name="title" label="活動タイトル" defaultValue={event?.title} required />
@@ -15,10 +15,14 @@ export function EventForm({ event, action }: { event?: Event; action: (formData:
       <VenueSelectFields defaultValue={event?.venue_name} />
       <Field name="address" label="住所" defaultValue={event?.address} required />
       <TimeSlotFields defaultStart={event?.start_datetime} defaultEnd={event?.end_datetime} />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={`grid gap-4 ${showCurrentParticipants ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <Field name="fee" label="参加費（円）" type="number" min="0" defaultValue={event?.fee ?? 0} required />
         <Field name="max_participants" label="最大人数" type="number" min="1" defaultValue={event?.max_participants ?? 12} required />
-        <Field name="current_participants" label="現在人数" type="number" min="0" defaultValue={event?.current_participants ?? 0} required />
+        {showCurrentParticipants ? (
+          <Field name="current_participants" label="現在人数" type="number" min="0" defaultValue={event?.current_participants ?? 0} required />
+        ) : (
+          <input name="current_participants" type="hidden" value={event?.current_participants ?? 0} />
+        )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Select name="level" label="レベル" defaultValue={event?.level} options={levels.map((item) => [item.value, item.label])} />

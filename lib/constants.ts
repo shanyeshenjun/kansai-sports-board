@@ -18,10 +18,10 @@ export const areas: Array<{ value: Area; label: string; zh: string }> = [
 ];
 
 export const statuses: Array<{ value: EventStatus; label: string; color: string; panel: string }> = [
-  { value: "open", label: "受付中", color: "bg-teal-700 text-white", panel: "border-teal-200 bg-teal-50 text-teal-900" },
-  { value: "full", label: "満員", color: "bg-amber-600 text-white", panel: "border-amber-200 bg-amber-50 text-amber-900" },
-  { value: "finished", label: "終了", color: "bg-zinc-700 text-white", panel: "border-zinc-200 bg-zinc-100 text-zinc-700" },
-  { value: "cancelled", label: "キャンセル", color: "bg-red-600 text-white", panel: "border-red-200 bg-red-50 text-red-800" }
+  { value: "open", label: "受付中", color: "bg-teal-100 text-teal-800 ring-1 ring-teal-200", panel: "border-teal-200 bg-teal-50 text-teal-900" },
+  { value: "full", label: "満員", color: "bg-amber-100 text-amber-800 ring-1 ring-amber-200", panel: "border-amber-200 bg-amber-50 text-amber-900" },
+  { value: "finished", label: "終了", color: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", panel: "border-slate-200 bg-slate-50 text-slate-600" },
+  { value: "cancelled", label: "キャンセル", color: "bg-red-100 text-red-700 ring-1 ring-red-200", panel: "border-red-200 bg-red-50 text-red-800" }
 ];
 
 export const levels: Array<{ value: EventLevel; label: string }> = [
@@ -85,6 +85,19 @@ export const venueShortNames: Record<string, string> = {
   "東淀川スポーツセンター": "東淀川"
 };
 
+export const venueMapQueries: Record<string, string> = {
+  "西SC（阿波座）スポーツセンター": "西スポーツセンター 阿波座 大阪",
+  "城東スポーツセンター": "城東スポーツセンター 大阪",
+  "西成スポーツセンター": "西成スポーツセンター 大阪",
+  "港区スポーツセンター": "港区スポーツセンター 大阪",
+  "天王寺スポーツセンター": "天王寺スポーツセンター 大阪",
+  "扇町スポーツセンター": "扇町スポーツセンター 大阪",
+  "阿倍野SCスポーツセンター": "阿倍野スポーツセンター 大阪",
+  "東成スポーツセンター": "東成スポーツセンター 大阪",
+  "浪速スポーツセンター": "浪速スポーツセンター 大阪",
+  "東淀川スポーツセンター": "東淀川スポーツセンター 大阪"
+};
+
 export const timeSlotOptions = [
   { value: "09:00-12:00", label: "09:00 - 12:00", start: "09:00", end: "12:00" },
   { value: "12:00-15:00", label: "12:00 - 15:00", start: "12:00", end: "15:00" },
@@ -104,4 +117,8 @@ export const venueShortName = (value: string) => {
   if (venueShortNames[value]) return venueShortNames[value];
   const fallback = value.replace(/スポーツセンター/g, "").slice(0, 4);
   return fallback || "その他";
+};
+export const venueMapUrl = (venueName: string, address?: string) => {
+  const query = venueMapQueries[venueName] ?? [venueName, address].filter(Boolean).join(" ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || venueName)}`;
 };
