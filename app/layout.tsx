@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { LanguageProvider, LanguageSwitcher, T } from "@/components/language-ui";
+import { MemberNav } from "@/components/member-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </Link>
               <div className="flex shrink-0 items-center gap-2">
                 <LanguageSwitcher />
+                <MemberNav />
                 <Link className="touch-target hidden items-center justify-center rounded-md border border-line px-3 text-sm font-bold sm:inline-flex" href="/admin">
                   管理画面
                 </Link>

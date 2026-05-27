@@ -3,12 +3,31 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { promisify } from "util";
 import { createClient } from "@supabase/supabase-js";
-import type { Area, Event, EventStatus, Gender, Organizer, OrganizerStatus, Registration, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
+import type {
+  Area,
+  Event,
+  EventStatus,
+  Friendship,
+  FriendshipStatus,
+  Gender,
+  MemberProfile,
+  Organizer,
+  OrganizerStatus,
+  ProfileReview,
+  PublicMemberProfile,
+  Registration,
+  RegistrationStatus,
+  SkillLevel,
+  SportType
+} from "@/lib/types";
 
 type Store = {
   events: Event[];
   registrations: Registration[];
   organizers: Organizer[];
+  members: MemberProfile[];
+  friendships: Friendship[];
+  profile_reviews: ProfileReview[];
 };
 
 type RegistrationResult = {
@@ -59,6 +78,19 @@ type OrganizerInput = {
   password: string;
   admin_note: string;
 };
+
+type MemberInput = {
+  login_id: string;
+  password: string;
+  display_name: string;
+  gender: Gender;
+  skill_level: SkillLevel | null;
+  bio: string;
+  title: string;
+  profile_public: boolean;
+};
+
+type MemberUpdateInput = Omit<MemberInput, "login_id" | "password">;
 
 const scrypt = promisify(scryptCallback);
 
@@ -202,6 +234,9 @@ const seedRegistrations: Registration[] = [
 ];
 
 const seedOrganizers: Organizer[] = [];
+const seedMembers: MemberProfile[] = [];
+const seedFriendships: Friendship[] = [];
+const seedProfileReviews: ProfileReview[] = [];
 
 function supabaseConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -230,12 +265,15 @@ function cloneStore(store: Store): Store {
   return {
     events: store.events.map((item) => ({ ...item })),
     registrations: store.registrations.map((item) => ({ ...item })),
-    organizers: (store.organizers ?? []).map((item) => ({ ...item }))
+    organizers: (store.organizers ?? []).map((item) => ({ ...item })),
+    members: (store.members ?? []).map((item) => ({ ...item })),
+    friendships: (store.friendships ?? []).map((item) => ({ ...item })),
+    profile_reviews: (store.profile_reviews ?? []).map((item) => ({ ...item }))
   };
 }
 
 function seedStore(): Store {
-  return cloneStore({ events: seedEvents, registrations: seedRegistrations, organizers: seedOrganizers });
+  return cloneStore({ events: seedEvents, registrations: seedRegistrations, organizers: seedOrganizers, members: seedMembers, friendships: seedFriendships, profile_reviews: seedProfileReviews });
 }
 
 function memoryStore(): Store {
@@ -257,7 +295,7 @@ function readLocalStore(): Store {
       return store;
     }
     const store = JSON.parse(readFileSync(dataFile, "utf8")) as Store;
-    return { events: store.events ?? [], registrations: store.registrations ?? [], organizers: store.organizers ?? [] };
+    return { events: store.events ?? [], registrations: store.registrations ?? [], organizers: store.organizers ?? [], members: store.members ?? [], friendships: store.friendships ?? [], profile_reviews: store.profile_reviews ?? [] };
   } catch {
     return memoryStore();
   }
@@ -670,6 +708,293 @@ export async function markOrganizerLogin(id: string) {
 
   const store = readLocalStore();
   store.organizers = store.organizers.map((organizer) => (organizer.id === id ? { ...organizer, last_login_at: timestamp } : organizer));
+  writeLocalStore(store);
+}
+
+function publicMember(member: MemberProfile): PublicMemberProfile {
+  return {
+    id: member.id,
+    display_name: member.display_name,
+    gender: member.gender,
+    skill_level: member.skill_level,
+    bio: member.bio,
+    title: member.title,
+    profile_public: member.profile_public,
+    created_at: member.created_at,
+    last_login_at: member.last_login_at
+  };
+}
+
+async function getMembersByIds(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  if (!uniqueIds.length) return [] as PublicMemberProfile[];
+
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin()
+      .from("members")
+      .select("id, display_name, gender, skill_level, bio, title, profile_public, created_at, last_login_at")
+      .in("id", uniqueIds);
+    if (error) throw new Error(formatSupabaseError(error));
+    return (data ?? []) as PublicMemberProfile[];
+  }
+
+  return readLocalStore()
+    .members.filter((member) => uniqueIds.includes(member.id))
+    .map(publicMember);
+}
+
+export async function getMember(id: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("members").select("*").eq("id", id).maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
+    return data ? (data as MemberProfile) : null;
+  }
+
+  return readLocalStore().members.find((member) => member.id === id) ?? null;
+}
+
+export async function getMemberByLoginId(loginId: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("members").select("*").eq("login_id", loginId).maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
+    return data ? (data as MemberProfile) : null;
+  }
+
+  return readLocalStore().members.find((member) => member.login_id === loginId) ?? null;
+}
+
+export async function getPublicMember(id: string) {
+  const member = await getMember(id);
+  return member ? publicMember(member) : null;
+}
+
+export async function createMember(input: MemberInput) {
+  const timestamp = new Date().toISOString();
+  const loginId = input.login_id.trim();
+  const displayName = input.display_name.trim();
+  if (!loginId || !input.password || !displayName) throw new Error("ログインID、パスワード、ニックネームを入力してください。");
+  if (!input.skill_level) throw new Error("自評レベルを選択してください。");
+  const passwordHash = await hashPassword(input.password);
+  const member: MemberProfile = {
+    id: randomUUID(),
+    login_id: loginId,
+    password_hash: passwordHash,
+    display_name: displayName,
+    gender: input.gender,
+    skill_level: input.skill_level,
+    bio: input.bio.trim() || null,
+    title: input.title.trim() || null,
+    profile_public: input.profile_public,
+    created_at: timestamp,
+    last_login_at: null
+  };
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("members").insert(member);
+    if (error) throw new Error(formatSupabaseError(error));
+    return member.id;
+  }
+
+  const store = readLocalStore();
+  if (store.members.some((item) => item.login_id === loginId)) throw new Error("このログインIDはすでに使われています。");
+  store.members.unshift(member);
+  writeLocalStore(store);
+  return member.id;
+}
+
+export async function updateMemberProfile(id: string, input: MemberUpdateInput) {
+  if (!input.display_name.trim()) throw new Error("ニックネームを入力してください。");
+  if (!input.skill_level) throw new Error("自評レベルを選択してください。");
+  const payload = {
+    display_name: input.display_name.trim(),
+    gender: input.gender,
+    skill_level: input.skill_level,
+    bio: input.bio.trim() || null,
+    title: input.title.trim() || null,
+    profile_public: input.profile_public
+  };
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("members").update(payload).eq("id", id);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+
+  const store = readLocalStore();
+  store.members = store.members.map((member) => (member.id === id ? { ...member, ...payload } : member));
+  writeLocalStore(store);
+}
+
+export async function markMemberLogin(id: string) {
+  const timestamp = new Date().toISOString();
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("members").update({ last_login_at: timestamp }).eq("id", id);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+
+  const store = readLocalStore();
+  store.members = store.members.map((member) => (member.id === id ? { ...member, last_login_at: timestamp } : member));
+  writeLocalStore(store);
+}
+
+export async function getFriendshipBetween(memberId: string, otherMemberId: string) {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin()
+      .from("friendships")
+      .select("*")
+      .or(`and(requester_id.eq.${memberId},receiver_id.eq.${otherMemberId}),and(requester_id.eq.${otherMemberId},receiver_id.eq.${memberId})`)
+      .maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
+    return data ? (data as Friendship) : null;
+  }
+
+  return (
+    readLocalStore().friendships.find(
+      (friendship) =>
+        (friendship.requester_id === memberId && friendship.receiver_id === otherMemberId) || (friendship.requester_id === otherMemberId && friendship.receiver_id === memberId)
+    ) ?? null
+  );
+}
+
+export async function areFriends(memberId: string, otherMemberId: string) {
+  const friendship = await getFriendshipBetween(memberId, otherMemberId);
+  return friendship?.status === "accepted";
+}
+
+export async function requestFriendship(requesterId: string, receiverId: string) {
+  if (requesterId === receiverId) throw new Error("自分には申請できません。");
+  const receiver = await getMember(receiverId);
+  if (!receiver) throw new Error("ユーザーが見つかりません。");
+  const existing = await getFriendshipBetween(requesterId, receiverId);
+  if (existing) {
+    if (existing.status !== "rejected") return;
+    if (supabaseConfigured()) {
+      const { error } = await supabaseAdmin()
+        .from("friendships")
+        .update({ requester_id: requesterId, receiver_id: receiverId, status: "pending", responded_at: null })
+        .eq("id", existing.id);
+      if (error) throw new Error(formatSupabaseError(error));
+    } else {
+      const store = readLocalStore();
+      store.friendships = store.friendships.map((friendship) =>
+        friendship.id === existing.id ? { ...friendship, requester_id: requesterId, receiver_id: receiverId, status: "pending", responded_at: null } : friendship
+      );
+      writeLocalStore(store);
+    }
+    return;
+  }
+
+  const friendship: Friendship = { id: randomUUID(), requester_id: requesterId, receiver_id: receiverId, status: "pending", created_at: new Date().toISOString(), responded_at: null };
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("friendships").insert(friendship);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+
+  const store = readLocalStore();
+  store.friendships.unshift(friendship);
+  writeLocalStore(store);
+}
+
+export async function respondFriendship(memberId: string, friendshipId: string, status: FriendshipStatus) {
+  const nextStatus = status === "accepted" ? "accepted" : "rejected";
+  const timestamp = new Date().toISOString();
+
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("friendships").select("*").eq("id", friendshipId).maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
+    const friendship = data as Friendship | null;
+    if (!friendship || friendship.receiver_id !== memberId || friendship.status !== "pending") throw new Error("この申請を処理できません。");
+    const { error: updateError } = await supabaseAdmin().from("friendships").update({ status: nextStatus, responded_at: timestamp }).eq("id", friendshipId);
+    if (updateError) throw new Error(formatSupabaseError(updateError));
+    return;
+  }
+
+  const store = readLocalStore();
+  const friendship = store.friendships.find((item) => item.id === friendshipId);
+  if (!friendship || friendship.receiver_id !== memberId || friendship.status !== "pending") throw new Error("この申請を処理できません。");
+  store.friendships = store.friendships.map((item) => (item.id === friendshipId ? { ...item, status: nextStatus, responded_at: timestamp } : item));
+  writeLocalStore(store);
+}
+
+export async function listFriendRequests(memberId: string) {
+  const friendships = supabaseConfigured()
+    ? await (async () => {
+        const { data, error } = await supabaseAdmin().from("friendships").select("*").eq("receiver_id", memberId).eq("status", "pending").order("created_at", { ascending: false });
+        if (error) throw new Error(formatSupabaseError(error));
+        return (data ?? []) as Friendship[];
+      })()
+    : readLocalStore().friendships.filter((friendship) => friendship.receiver_id === memberId && friendship.status === "pending");
+  const requesters = await getMembersByIds(friendships.map((friendship) => friendship.requester_id));
+  return friendships.map((friendship) => ({ ...friendship, requester: requesters.find((member) => member.id === friendship.requester_id) ?? null }));
+}
+
+export async function listFriends(memberId: string) {
+  const friendships = supabaseConfigured()
+    ? await (async () => {
+        const { data, error } = await supabaseAdmin()
+          .from("friendships")
+          .select("*")
+          .eq("status", "accepted")
+          .or(`requester_id.eq.${memberId},receiver_id.eq.${memberId}`)
+          .order("created_at", { ascending: false });
+        if (error) throw new Error(formatSupabaseError(error));
+        return (data ?? []) as Friendship[];
+      })()
+    : readLocalStore().friendships.filter((friendship) => friendship.status === "accepted" && (friendship.requester_id === memberId || friendship.receiver_id === memberId));
+  const otherIds = friendships.map((friendship) => (friendship.requester_id === memberId ? friendship.receiver_id : friendship.requester_id));
+  return getMembersByIds(otherIds);
+}
+
+export async function listProfileReviews(targetId: string, options?: { includeHidden?: boolean }) {
+  const reviews = supabaseConfigured()
+    ? await (async () => {
+        let query = supabaseAdmin().from("profile_reviews").select("*").eq("target_id", targetId).order("created_at", { ascending: false });
+        if (!options?.includeHidden) query = query.eq("is_visible", true);
+        const { data, error } = await query;
+        if (error) throw new Error(formatSupabaseError(error));
+        return (data ?? []) as ProfileReview[];
+      })()
+    : readLocalStore().profile_reviews.filter((review) => review.target_id === targetId && (options?.includeHidden || review.is_visible));
+  const reviewers = await getMembersByIds(reviews.map((review) => review.reviewer_id));
+  return reviews.map((review) => ({ ...review, reviewer: reviewers.find((member) => member.id === review.reviewer_id) ?? null }));
+}
+
+export async function createProfileReview(reviewerId: string, targetId: string, input: { rating_skill: SkillLevel | null; comment: string }) {
+  if (reviewerId === targetId) throw new Error("自分には評価できません。");
+  if (!(await areFriends(reviewerId, targetId))) throw new Error("友達になってから評価できます。");
+  if (!input.rating_skill && !input.comment.trim()) throw new Error("評価またはコメントを入力してください。");
+  const review: ProfileReview = {
+    id: randomUUID(),
+    reviewer_id: reviewerId,
+    target_id: targetId,
+    rating_skill: input.rating_skill,
+    comment: input.comment.trim() || null,
+    is_visible: true,
+    created_at: new Date().toISOString()
+  };
+
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("profile_reviews").insert(review);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+
+  const store = readLocalStore();
+  store.profile_reviews.unshift(review);
+  writeLocalStore(store);
+}
+
+export async function hideProfileReview(memberId: string, reviewId: string) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("profile_reviews").update({ is_visible: false }).eq("id", reviewId).eq("target_id", memberId);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+
+  const store = readLocalStore();
+  store.profile_reviews = store.profile_reviews.map((review) => (review.id === reviewId && review.target_id === memberId ? { ...review, is_visible: false } : review));
   writeLocalStore(store);
 }
 

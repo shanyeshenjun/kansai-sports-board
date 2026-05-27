@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { registerAction } from "@/app/actions";
+import { currentMember, registerAction } from "@/app/actions";
 import { SkillLevelGuide, T } from "@/components/language-ui";
 import { RegistrationPublicFields } from "@/components/registration-public-fields";
 import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName, venueMapUrl } from "@/lib/constants";
@@ -18,6 +18,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
   const event = await getEvent(id);
   if (!event) notFound();
   const registrations = await listRegistrations(event.id);
+  const member = await currentMember();
   const activeRegistrations = registrations.filter((registration) => (registration.status ?? "active") === "active");
 
   const sport = sportName(event.sport_type);
@@ -157,7 +158,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
                 <T textKey="peopleField" />
               <input className="touch-target rounded-md border border-line px-3" name="number_of_people" type="number" min="1" max={remaining} defaultValue="1" required />
               </label>
-              <RegistrationPublicFields />
+              <RegistrationPublicFields initialProfile={member ? { display_name: member.display_name, gender: member.gender, skill_level: member.skill_level } : null} />
               <p className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-500">
                 <T textKey="publicHint" />
               </p>

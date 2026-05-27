@@ -6,27 +6,37 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   cancelRegistrationByCode,
+  createMember,
   createOrganizer,
+  createProfileReview,
   getCancellationPreview,
+  getMember,
+  getMemberByLoginId,
   getOrganizer,
   getOrganizerByLoginId,
+  hideProfileReview,
+  markMemberLogin,
   markOrganizerLogin,
   parseEventForm,
   register,
+  requestFriendship,
+  respondFriendship,
   resetOrganizerPassword,
   saveEvent,
   setEventStatus,
   setOrganizerStatus,
   setRegistrationStatusByAdmin,
   softDeleteEvent,
+  updateMemberProfile,
   verifyPassword
 } from "@/lib/store";
-import type { EventStatus, Gender, RegistrationStatus, SkillLevel } from "@/lib/types";
+import type { EventStatus, FriendshipStatus, Gender, RegistrationStatus, SkillLevel } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
 const lastRegistrationCookie = "ksb_last_registration";
 const cancellationRequestCookie = "ksb_cancel_request";
 const organizerSessionCookie = "ksb_organizer";
+const memberSessionCookie = "ksb_member";
 
 function sessionSecret() {
   return process.env.ADMIN_PASSWORD || process.env.SUPABASE_SERVICE_ROLE_KEY || defaultAdminPassword;
@@ -37,11 +47,27 @@ function signOrganizerSession(id: string) {
   return `${id}.${signature}`;
 }
 
+function signMemberSession(id: string) {
+  const signature = createHmac("sha256", sessionSecret()).update(`member:${id}`).digest("hex");
+  return `${id}.${signature}`;
+}
+
 function verifyOrganizerSession(value?: string) {
   if (!value) return null;
   const [id, signature] = value.split(".");
   if (!id || !signature) return null;
   const expected = createHmac("sha256", sessionSecret()).update(id).digest("hex");
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) return null;
+  return timingSafeEqual(actualBuffer, expectedBuffer) ? id : null;
+}
+
+function verifyMemberSession(value?: string) {
+  if (!value) return null;
+  const [id, signature] = value.split(".");
+  if (!id || !signature) return null;
+  const expected = createHmac("sha256", sessionSecret()).update(`member:${id}`).digest("hex");
   const actualBuffer = Buffer.from(signature);
   const expectedBuffer = Buffer.from(expected);
   if (actualBuffer.length !== expectedBuffer.length) return null;
@@ -77,6 +103,156 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete("ksb_admin");
   redirect("/");
+}
+
+function parseGender(value: FormDataEntryValue | null): Gender {
+  const gender = String(value ?? "private");
+  return gender === "male" || gender === "female" ? gender : "private";
+}
+
+function parseSkillLevel(value: FormDataEntryValue | null): SkillLevel | null {
+  const skill = Number(value ?? 0);
+  return skill >= 1 && skill <= 5 ? (skill as SkillLevel) : null;
+}
+
+function parseProfilePublic(value: FormDataEntryValue | null) {
+  return String(value ?? "") === "on" || String(value ?? "") === "true";
+}
+
+export async function currentMember() {
+  const cookieStore = await cookies();
+  const id = verifyMemberSession(cookieStore.get(memberSessionCookie)?.value);
+  if (!id) return null;
+  try {
+    return await getMember(id);
+  } catch {
+    return null;
+  }
+}
+
+export async function requireMember() {
+  const member = await currentMember();
+  if (!member) redirect("/login");
+  return member;
+}
+
+export async function registerMemberAction(formData: FormData) {
+  let memberId: string;
+  try {
+    memberId = await createMember({
+      login_id: String(formData.get("login_id") ?? ""),
+      password: String(formData.get("password") ?? ""),
+      display_name: String(formData.get("display_name") ?? ""),
+      gender: parseGender(formData.get("gender")),
+      skill_level: parseSkillLevel(formData.get("skill_level")),
+      bio: String(formData.get("bio") ?? ""),
+      title: String(formData.get("title") ?? ""),
+      profile_public: parseProfilePublic(formData.get("profile_public"))
+    });
+  } catch (error) {
+    redirect(`/register?error=${encodeURIComponent(error instanceof Error ? error.message : "登録できませんでした。")}`);
+  }
+
+  await markMemberLogin(memberId);
+  const cookieStore = await cookies();
+  cookieStore.set(memberSessionCookie, signMemberSession(memberId), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 14
+  });
+  redirect("/me");
+}
+
+export async function memberLoginAction(formData: FormData) {
+  const loginId = String(formData.get("login_id") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const member = await getMemberByLoginId(loginId);
+  if (!member || !(await verifyPassword(password, member.password_hash))) {
+    redirect("/login?error=1");
+  }
+  await markMemberLogin(member.id);
+  const cookieStore = await cookies();
+  cookieStore.set(memberSessionCookie, signMemberSession(member.id), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 14
+  });
+  redirect("/me");
+}
+
+export async function memberLogoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete(memberSessionCookie);
+  redirect("/");
+}
+
+export async function updateMyProfileAction(formData: FormData) {
+  const member = await requireMember();
+  try {
+    await updateMemberProfile(member.id, {
+      display_name: String(formData.get("display_name") ?? ""),
+      gender: parseGender(formData.get("gender")),
+      skill_level: parseSkillLevel(formData.get("skill_level")),
+      bio: String(formData.get("bio") ?? ""),
+      title: String(formData.get("title") ?? ""),
+      profile_public: parseProfilePublic(formData.get("profile_public"))
+    });
+  } catch (error) {
+    redirect(`/me?error=${encodeURIComponent(error instanceof Error ? error.message : "更新できませんでした。")}`);
+  }
+  revalidatePath("/me");
+  revalidatePath(`/users/${member.id}`);
+  redirect("/me?updated=1");
+}
+
+export async function requestFriendAction(formData: FormData) {
+  const member = await requireMember();
+  const targetId = String(formData.get("target_id") ?? "");
+  try {
+    await requestFriendship(member.id, targetId);
+  } catch (error) {
+    redirect(`/users/${targetId}?error=${encodeURIComponent(error instanceof Error ? error.message : "申請できませんでした。")}`);
+  }
+  revalidatePath(`/users/${targetId}`);
+  revalidatePath("/me");
+  redirect(`/users/${targetId}?friend=sent`);
+}
+
+export async function respondFriendAction(formData: FormData) {
+  const member = await requireMember();
+  const friendshipId = String(formData.get("friendship_id") ?? "");
+  const status = String(formData.get("status") ?? "rejected") === "accepted" ? "accepted" : "rejected";
+  await respondFriendship(member.id, friendshipId, status as FriendshipStatus);
+  revalidatePath("/me");
+  redirect("/me");
+}
+
+export async function createReviewAction(formData: FormData) {
+  const member = await requireMember();
+  const targetId = String(formData.get("target_id") ?? "");
+  try {
+    await createProfileReview(member.id, targetId, {
+      rating_skill: parseSkillLevel(formData.get("rating_skill")),
+      comment: String(formData.get("comment") ?? "")
+    });
+  } catch (error) {
+    redirect(`/users/${targetId}?error=${encodeURIComponent(error instanceof Error ? error.message : "評価を送信できませんでした。")}`);
+  }
+  revalidatePath(`/users/${targetId}`);
+  redirect(`/users/${targetId}?review=sent`);
+}
+
+export async function hideReviewAction(formData: FormData) {
+  const member = await requireMember();
+  const reviewId = String(formData.get("review_id") ?? "");
+  await hideProfileReview(member.id, reviewId);
+  revalidatePath("/me");
+  revalidatePath(`/users/${member.id}`);
+  redirect("/me");
 }
 
 export async function currentOrganizer() {
@@ -291,10 +467,8 @@ export async function deleteOrganizerEventAction(formData: FormData) {
 }
 
 export async function registerAction(eventId: string, formData: FormData) {
-  const genderValue = String(formData.get("gender") ?? "private");
-  const gender: Gender = genderValue === "male" || genderValue === "female" ? genderValue : "private";
-  const skillValue = Number(formData.get("skill_level") ?? 0);
-  const skillLevel = skillValue >= 1 && skillValue <= 5 ? (skillValue as SkillLevel) : null;
+  const gender = parseGender(formData.get("gender"));
+  const skillLevel = parseSkillLevel(formData.get("skill_level"));
   const isPublic = String(formData.get("is_public") ?? "false") === "true";
   const result = await register(eventId, {
     participant_name: String(formData.get("participant_name") ?? ""),

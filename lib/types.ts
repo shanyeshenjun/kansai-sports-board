@@ -7,6 +7,7 @@ export type Gender = "male" | "female" | "private";
 export type SkillLevel = 1 | 2 | 3 | 4 | 5;
 export type RegistrationStatus = "active" | "cancelled";
 export type OrganizerStatus = "active" | "disabled";
+export type FriendshipStatus = "pending" | "accepted" | "rejected";
 
 export type Event = {
   id: string;
@@ -60,4 +61,40 @@ export type Registration = {
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
   created_at: string;
+};
+
+export type MemberProfile = {
+  id: string;
+  login_id: string;
+  password_hash: string;
+  display_name: string;
+  gender: Gender;
+  skill_level: SkillLevel | null;
+  bio?: string | null;
+  title?: string | null;
+  profile_public: boolean;
+  created_at: string;
+  last_login_at?: string | null;
+};
+
+export type PublicMemberProfile = Omit<MemberProfile, "login_id" | "password_hash">;
+
+export type Friendship = {
+  id: string;
+  requester_id: string;
+  receiver_id: string;
+  status: FriendshipStatus;
+  created_at: string;
+  responded_at?: string | null;
+};
+
+export type ProfileReview = {
+  id: string;
+  reviewer_id: string;
+  target_id: string;
+  rating_skill?: SkillLevel | null;
+  comment?: string | null;
+  is_visible: boolean;
+  created_at: string;
+  reviewer?: Pick<PublicMemberProfile, "id" | "display_name" | "title"> | null;
 };

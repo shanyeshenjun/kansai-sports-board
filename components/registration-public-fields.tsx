@@ -13,14 +13,21 @@ type StoredProfile = {
   is_public?: string;
 };
 
-export function RegistrationPublicFields() {
+type InitialProfile = {
+  display_name?: string | null;
+  gender?: string | null;
+  skill_level?: number | null;
+};
+
+export function RegistrationPublicFields({ initialProfile }: { initialProfile?: InitialProfile | null }) {
   const { language, t } = useLanguage();
-  const [displayName, setDisplayName] = useState("");
-  const [gender, setGender] = useState("private");
-  const [skillLevel, setSkillLevel] = useState("");
+  const [displayName, setDisplayName] = useState(initialProfile?.display_name ?? "");
+  const [gender, setGender] = useState(initialProfile?.gender === "male" || initialProfile?.gender === "female" ? initialProfile.gender : "private");
+  const [skillLevel, setSkillLevel] = useState(initialProfile?.skill_level ? String(initialProfile.skill_level) : "");
   const [isPublic, setIsPublic] = useState("false");
 
   useEffect(() => {
+    if (initialProfile) return;
     try {
       const stored = localStorage.getItem(storageKey);
       if (!stored) return;
@@ -32,7 +39,7 @@ export function RegistrationPublicFields() {
     } catch {
       localStorage.removeItem(storageKey);
     }
-  }, []);
+  }, [initialProfile]);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ display_name: displayName, gender, skill_level: skillLevel, is_public: isPublic }));
