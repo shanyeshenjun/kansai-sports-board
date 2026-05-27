@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { registerAction } from "@/app/actions";
-import { SkillLevelGuide, T, translatedStatusKey } from "@/components/language-ui";
+import { SkillLevelGuide, T } from "@/components/language-ui";
 import { RegistrationPublicFields } from "@/components/registration-public-fields";
 import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName, venueMapUrl } from "@/lib/constants";
+import { translatedStatusKey } from "@/lib/i18n";
 import { formatCancelDeadlineJST, formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
 import type { Gender, Registration, SkillLevel } from "@/lib/types";
 import type { ReactNode } from "react";

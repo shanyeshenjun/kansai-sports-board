@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { T, translatedStatusKey } from "@/components/language-ui";
+import { T } from "@/components/language-ui";
 import { areaName, sportName, statusName } from "@/lib/constants";
+import { translatedStatusKey } from "@/lib/i18n";
 import type { Event } from "@/lib/types";
 import { formatDate, formatTime, yen } from "@/lib/store";
 

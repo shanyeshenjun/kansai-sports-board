@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { translatedStatusKey, useLanguage } from "@/components/language-ui";
+import { useLanguage } from "@/components/language-ui";
 import { venueShortName } from "@/lib/constants";
+import { translatedStatusKey } from "@/lib/i18n";
 import type { Event, EventStatus } from "@/lib/types";
 
 type CalendarEvent = Event & { dateKey: string; startTime: string; endTime: string };

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { defaultLanguage, dictionary, languages, skillLevelDescriptions, translate, type Language, type TranslationKey } from "@/lib/i18n";
+import { defaultLanguage, languages, skillLevelDescriptions, translate, type Language, type TranslationKey } from "@/lib/i18n";
 
 const storageKey = "ksb_language";
 
@@ -98,12 +98,3 @@ export function SkillLevelGuide({ compact = false }: { compact?: boolean }) {
     </details>
   );
 }
-
-export function translatedStatusKey(status: string): TranslationKey {
-  if (status === "full") return "statusFull";
-  if (status === "finished") return "statusFinished";
-  if (status === "cancelled") return "statusCancelled";
-  return "statusOpen";
-}
-
-export { dictionary };

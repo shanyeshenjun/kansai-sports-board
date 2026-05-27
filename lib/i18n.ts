@@ -244,6 +244,13 @@ export const dictionary = {
 
 export type TranslationKey = keyof (typeof dictionary)["ja"];
 
+export function translatedStatusKey(status: string): TranslationKey {
+  if (status === "full") return "statusFull";
+  if (status === "finished") return "statusFinished";
+  if (status === "cancelled") return "statusCancelled";
+  return "statusOpen";
+}
+
 export const skillLevelDescriptions = {
   ja: [
     { level: 1, label: "Lv.1 初心者", description: "始めたばかりで、ルールや基本動作を学んでいる段階です。" },
