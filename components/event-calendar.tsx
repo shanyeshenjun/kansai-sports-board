@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { statusName, venueShortName } from "@/lib/constants";
+import { translatedStatusKey, useLanguage } from "@/components/language-ui";
+import { venueShortName } from "@/lib/constants";
 import type { Event, EventStatus } from "@/lib/types";
 
 type CalendarEvent = Event & { dateKey: string; startTime: string; endTime: string };
@@ -59,6 +60,7 @@ function addMonths(year: number, month: number, delta: number) {
 }
 
 export function EventCalendar({ events }: { events: Event[] }) {
+  const { t } = useLanguage();
   const calendarEvents = useMemo(
     () =>
       events
@@ -113,8 +115,8 @@ export function EventCalendar({ events }: { events: Event[] }) {
     <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:sticky lg:top-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-black text-slate-950">活動カレンダー</h2>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">表示中の活動日を確認できます。</p>
+          <h2 className="text-base font-black text-slate-950">Calendar</h2>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">{t("date")} / {t("openNow")}</p>
         </div>
         <div className="flex gap-1">
           <button className="touch-target h-9 w-9 rounded-md border border-line text-sm font-black" type="button" onClick={() => moveMonth(-1)} aria-label="前の月">
@@ -170,7 +172,7 @@ export function EventCalendar({ events }: { events: Event[] }) {
                   {venueShortName(event.venue_name)} {event.startTime}-{event.endTime}
                 </span>
                 <span className="mt-0.5 block truncate text-xs font-medium text-slate-500">
-                  {statusName(event.status).label} / {event.title}
+                  {t(translatedStatusKey(event.status))} / {event.title}
                 </span>
               </Link>
             ))}

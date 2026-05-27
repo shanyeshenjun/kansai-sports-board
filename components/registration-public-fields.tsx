@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { genders, skillLevels } from "@/lib/constants";
+import { SkillLevelGuide, useLanguage } from "@/components/language-ui";
+import { skillLevelDescriptions } from "@/lib/i18n";
 
 const storageKey = "ksb_registration_public_profile";
 
@@ -13,6 +14,7 @@ type StoredProfile = {
 };
 
 export function RegistrationPublicFields() {
+  const { language, t } = useLanguage();
   const [displayName, setDisplayName] = useState("");
   const [gender, setGender] = useState("private");
   const [skillLevel, setSkillLevel] = useState("");
@@ -42,27 +44,26 @@ export function RegistrationPublicFields() {
         className="touch-target rounded-md border border-line px-3"
         name="display_name"
         onChange={(event) => setDisplayName(event.target.value)}
-        placeholder="表示用ニックネーム（公開する場合は必須）"
+        placeholder={t("displayName")}
         value={displayName}
       />
       <select className="touch-target rounded-md border border-line px-3 text-sm font-bold" name="gender" onChange={(event) => setGender(event.target.value)} value={gender}>
-        {genders.map((item) => (
-          <option key={item.value} value={item.value}>
-            {item.label}
-          </option>
-        ))}
+        <option value="male">{t("male")}</option>
+        <option value="female">{t("female")}</option>
+        <option value="private">{t("private")}</option>
       </select>
       <select className="touch-target rounded-md border border-line px-3 text-sm font-bold" name="skill_level" onChange={(event) => setSkillLevel(event.target.value)} required value={skillLevel}>
-        <option value="">レベルを選択してください</option>
-        {skillLevels.map((item) => (
-          <option key={item.value} value={item.value}>
+        <option value="">{t("selectSkillLevel")}</option>
+        {skillLevelDescriptions[language].map((item) => (
+          <option key={item.level} value={item.level}>
             {item.label}
           </option>
         ))}
       </select>
+      <SkillLevelGuide compact />
       <select className="touch-target rounded-md border border-line px-3 text-sm font-bold" name="is_public" onChange={(event) => setIsPublic(event.target.value)} value={isPublic}>
-        <option value="false">公開しない</option>
-        <option value="true">公開する</option>
+        <option value="false">{t("publicOff")}</option>
+        <option value="true">{t("publicOn")}</option>
       </select>
     </div>
   );
