@@ -24,5 +24,9 @@ add column if not exists organizer_id uuid references public.organizers(id) on d
 create index if not exists events_organizer_id_idx on public.events(organizer_id);
 create index if not exists organizers_status_idx on public.organizers(status);
 
+grant usage on schema public to service_role;
+grant select, insert, update on table public.organizers to service_role;
+grant select, update on table public.events to service_role;
+
 -- Existing events keep organizer_id = null and remain admin-managed.
 -- Organizer passwords are created by the app with Node.js scrypt hashes.

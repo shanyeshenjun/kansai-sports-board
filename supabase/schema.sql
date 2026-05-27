@@ -70,6 +70,9 @@ create index if not exists registrations_event_id_idx on public.registrations(ev
 create index if not exists registrations_status_idx on public.registrations(status);
 create index if not exists organizers_status_idx on public.organizers(status);
 
+grant usage on schema public to service_role;
+grant select, insert, update on table public.organizers to service_role;
+
 create or replace function public.register_for_event(
   p_event_id text,
   p_participant_name text,

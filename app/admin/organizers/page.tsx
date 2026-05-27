@@ -17,14 +17,19 @@ export default async function AdminOrganizersPage({ searchParams }: { searchPara
 
       <section className="mt-4 rounded-xl border border-line bg-white p-4 shadow-sm">
         <h1 className="text-2xl font-black text-slate-950">主催者管理</h1>
-        <p className="mt-1 text-sm leading-6 text-slate-600">公開登録は使わず、管理者が招待制で主催者アカウントを作成します。</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">ここは管理者専用の主催者管理ページです。公開登録は使わず、管理者が招待制で主催者アカウントを作成します。</p>
+        <div className="mt-3 flex flex-col gap-2 rounded-lg bg-teal-50 p-3 text-sm leading-6 text-teal-900 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-bold">主催者本人は、以下の専用ログインページからログインしてください。</p>
+          <Link className="touch-target inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-black text-white" href="/organizer/login">
+            主催者ログインページを開く
+          </Link>
+        </div>
         {query.error ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{String(query.error)}</p> : null}
         {query.reset ? <p className="mt-3 rounded-md bg-teal-50 p-3 text-sm font-bold text-teal-800">パスワードを更新しました。</p> : null}
         {loadError ? (
           <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold leading-6 text-red-700">
-            主催者一覧を読み込めませんでした。Supabase の migration が未実行、または権限設定が不足している可能性があります。先に
-            <code className="mx-1 rounded bg-white px-1 py-0.5">supabase/20260527_add_invited_organizers.sql</code>
-            を確認してください。
+            主催者一覧を読み込めませんでした。Supabase の migration または権限設定を確認してください。
+            <span className="mt-2 block rounded bg-white px-2 py-1 font-mono text-xs text-red-800">Supabase error: {loadError}</span>
           </p>
         ) : null}
 

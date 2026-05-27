@@ -222,6 +222,10 @@ function supabaseAdmin() {
   });
 }
 
+function formatSupabaseError(error: { code?: string; message?: string; details?: string; hint?: string }) {
+  return [error.code, error.message, error.details, error.hint].filter(Boolean).join(" / ") || "Supabase error";
+}
+
 function cloneStore(store: Store): Store {
   return {
     events: store.events.map((item) => ({ ...item })),
@@ -563,8 +567,11 @@ export async function listRegistrations(eventId: string) {
 
 export async function listOrganizers() {
   if (supabaseConfigured()) {
-    const { data, error } = await supabaseAdmin().from("organizers").select("*").order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    const { data, error } = await supabaseAdmin()
+      .from("organizers")
+      .select("id, login_id, display_name, status, created_at, last_login_at, admin_note")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(formatSupabaseError(error));
     return (data ?? []) as Organizer[];
   }
 
@@ -573,8 +580,8 @@ export async function listOrganizers() {
 
 export async function getOrganizer(id: string) {
   if (supabaseConfigured()) {
-    const { data, error } = await supabaseAdmin().from("organizers").select("*").eq("id", id).maybeSingle();
-    if (error) throw new Error(error.message);
+    const { data, error } = await supabaseAdmin().from("organizers").select("id, login_id, display_name, status, created_at, last_login_at, admin_note").eq("id", id).maybeSingle();
+    if (error) throw new Error(formatSupabaseError(error));
     return data ? (data as Organizer) : null;
   }
 
@@ -584,7 +591,7 @@ export async function getOrganizer(id: string) {
 export async function getOrganizerByLoginId(loginId: string) {
   if (supabaseConfigured()) {
     const { data, error } = await supabaseAdmin().from("organizers").select("*").eq("login_id", loginId).maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(formatSupabaseError(error));
     return data ? (data as Organizer) : null;
   }
 
