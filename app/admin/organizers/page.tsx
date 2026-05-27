@@ -7,7 +7,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export default async function AdminOrganizersPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin();
   const query = await searchParams;
-  const organizers = await listOrganizers();
+  const { organizers, loadError } = await safeListOrganizers();
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-5">
@@ -20,6 +20,13 @@ export default async function AdminOrganizersPage({ searchParams }: { searchPara
         <p className="mt-1 text-sm leading-6 text-slate-600">公開登録は使わず、管理者が招待制で主催者アカウントを作成します。</p>
         {query.error ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{String(query.error)}</p> : null}
         {query.reset ? <p className="mt-3 rounded-md bg-teal-50 p-3 text-sm font-bold text-teal-800">パスワードを更新しました。</p> : null}
+        {loadError ? (
+          <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold leading-6 text-red-700">
+            主催者一覧を読み込めませんでした。Supabase の migration が未実行、または権限設定が不足している可能性があります。先に
+            <code className="mx-1 rounded bg-white px-1 py-0.5">supabase/20260527_add_invited_organizers.sql</code>
+            を確認してください。
+          </p>
+        ) : null}
 
         <form action={createOrganizerAction} className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-bold text-slate-800">
@@ -46,7 +53,9 @@ export default async function AdminOrganizersPage({ searchParams }: { searchPara
 
       <section className="mt-4 rounded-xl border border-line bg-white p-4 shadow-sm">
         <h2 className="text-lg font-black text-slate-950">主催者一覧</h2>
-        {organizers.length ? (
+        {loadError ? (
+          <p className="mt-4 rounded-md bg-slate-100 p-4 text-sm text-slate-600">一覧は現在表示できません。</p>
+        ) : organizers.length ? (
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line text-slate-500">
@@ -70,8 +79,8 @@ export default async function AdminOrganizersPage({ searchParams }: { searchPara
                         {organizer.status === "active" ? "有効" : "無効"}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-4">{formatDateTimeJST(organizer.created_at)}</td>
-                    <td className="whitespace-nowrap py-3 pr-4">{organizer.last_login_at ? formatDateTimeJST(organizer.last_login_at) : "-"}</td>
+                    <td className="whitespace-nowrap py-3 pr-4">{safeDateTime(organizer.created_at)}</td>
+                    <td className="whitespace-nowrap py-3 pr-4">{safeDateTime(organizer.last_login_at)}</td>
                     <td className="min-w-40 py-3 pr-4">{organizer.admin_note || "-"}</td>
                     <td className="min-w-72 py-3 pr-4">
                       <div className="grid gap-2">
@@ -97,9 +106,25 @@ export default async function AdminOrganizersPage({ searchParams }: { searchPara
             </table>
           </div>
         ) : (
-          <p className="mt-4 rounded-md bg-slate-100 p-4 text-sm text-slate-600">まだ主催者アカウントはありません。</p>
+          <p className="mt-4 rounded-md bg-slate-100 p-4 text-sm text-slate-600">まだ主催者はいません。</p>
         )}
       </section>
     </main>
   );
+}
+
+async function safeListOrganizers() {
+  try {
+    return { organizers: await listOrganizers(), loadError: null as string | null };
+  } catch (error) {
+    console.error("Failed to load organizers", error);
+    return { organizers: [], loadError: error instanceof Error ? error.message : "unknown error" };
+  }
+}
+
+function safeDateTime(value?: string | null) {
+  if (!value) return "-";
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "-";
+  return formatDateTimeJST(value);
 }
