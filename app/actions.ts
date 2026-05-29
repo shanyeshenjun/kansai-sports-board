@@ -15,6 +15,7 @@ import {
   getOrganizer,
   getOrganizerByLoginId,
   hideProfileReview,
+  hideProfileReviewByAdmin,
   markMemberLogin,
   markOrganizerLogin,
   parseEventForm,
@@ -24,13 +25,15 @@ import {
   resetOrganizerPassword,
   saveEvent,
   setEventStatus,
+  setMemberProfilePublicByAdmin,
+  setMemberStatusByAdmin,
   setOrganizerStatus,
   setRegistrationStatusByAdmin,
   softDeleteEvent,
   updateMemberProfile,
   verifyPassword
 } from "@/lib/store";
-import type { EventStatus, FriendshipStatus, Gender, RegistrationStatus, SkillLevel } from "@/lib/types";
+import type { EventStatus, FriendshipStatus, Gender, MemberStatus, RegistrationStatus, SkillLevel } from "@/lib/types";
 
 const defaultAdminPassword = "change-me-local-admin";
 const lastRegistrationCookie = "ksb_last_registration";
@@ -124,7 +127,9 @@ export async function currentMember() {
   const id = verifyMemberSession(cookieStore.get(memberSessionCookie)?.value);
   if (!id) return null;
   try {
-    return await getMember(id);
+    const member = await getMember(id);
+    if (!member || (member.status ?? "active") !== "active") return null;
+    return member;
   } catch {
     return null;
   }
@@ -169,7 +174,7 @@ export async function memberLoginAction(formData: FormData) {
   const loginId = String(formData.get("login_id") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const member = await getMemberByLoginId(loginId);
-  if (!member || !(await verifyPassword(password, member.password_hash))) {
+  if (!member || (member.status ?? "active") !== "active" || !(await verifyPassword(password, member.password_hash))) {
     redirect("/login?error=1");
   }
   await markMemberLogin(member.id);
@@ -343,6 +348,37 @@ export async function changeRegistrationStatusAction(formData: FormData) {
     redirect(`/admin/events/${eventId || result.event_id}/registrations?error=${encodeURIComponent(result.message ?? "更新できませんでした。")}`);
   }
   redirect(`/admin/events/${eventId || result.event_id}/registrations`);
+}
+
+export async function changeMemberStatusAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("member_id") ?? "");
+  const status = String(formData.get("status") ?? "active") === "disabled" ? "disabled" : "active";
+  await setMemberStatusByAdmin(id, status as MemberStatus);
+  revalidatePath("/admin/members");
+  revalidatePath(`/admin/members/${id}`);
+  redirect(`/admin/members/${id}`);
+}
+
+export async function hideMemberProfileAction(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("member_id") ?? "");
+  await setMemberProfilePublicByAdmin(id, false);
+  revalidatePath("/admin/members");
+  revalidatePath(`/admin/members/${id}`);
+  revalidatePath(`/users/${id}`);
+  redirect(`/admin/members/${id}`);
+}
+
+export async function hideReviewByAdminAction(formData: FormData) {
+  await requireAdmin();
+  const memberId = String(formData.get("member_id") ?? "");
+  const reviewId = String(formData.get("review_id") ?? "");
+  await hideProfileReviewByAdmin(reviewId);
+  revalidatePath("/admin/members");
+  revalidatePath(`/admin/members/${memberId}`);
+  revalidatePath(`/users/${memberId}`);
+  redirect(`/admin/members/${memberId}`);
 }
 
 export async function createOrganizerAction(formData: FormData) {

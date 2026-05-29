@@ -8,6 +8,7 @@ export type SkillLevel = 1 | 2 | 3 | 4 | 5;
 export type RegistrationStatus = "active" | "cancelled";
 export type OrganizerStatus = "active" | "disabled";
 export type FriendshipStatus = "pending" | "accepted" | "rejected";
+export type MemberStatus = "active" | "disabled";
 
 export type Event = {
   id: string;
@@ -73,6 +74,7 @@ export type MemberProfile = {
   bio?: string | null;
   title?: string | null;
   profile_public: boolean;
+  status?: MemberStatus | null;
   created_at: string;
   last_login_at?: string | null;
 };

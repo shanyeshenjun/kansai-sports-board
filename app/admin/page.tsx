@@ -31,6 +31,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
             <Link className="touch-target inline-flex items-center justify-center rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-black text-teal-800" href="/admin/organizers">
               主催者管理
             </Link>
+            <Link className="touch-target inline-flex items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800" href="/admin/members">
+              会員管理
+            </Link>
             <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line bg-white px-4 py-3 text-sm font-bold" href={showDeleted ? "/admin" : "/admin?deleted=1"}>
               {showDeleted ? "削除済みを隠す" : "削除済みも表示"}
             </Link>

@@ -11,6 +11,7 @@ import type {
   FriendshipStatus,
   Gender,
   MemberProfile,
+  MemberStatus,
   Organizer,
   OrganizerStatus,
   ProfileReview,
@@ -720,6 +721,7 @@ function publicMember(member: MemberProfile): PublicMemberProfile {
     bio: member.bio,
     title: member.title,
     profile_public: member.profile_public,
+    status: member.status ?? "active",
     created_at: member.created_at,
     last_login_at: member.last_login_at
   };
@@ -732,7 +734,7 @@ async function getMembersByIds(ids: string[]) {
   if (supabaseConfigured()) {
     const { data, error } = await supabaseAdmin()
       .from("members")
-      .select("id, display_name, gender, skill_level, bio, title, profile_public, created_at, last_login_at")
+      .select("id, display_name, gender, skill_level, bio, title, profile_public, status, created_at, last_login_at")
       .in("id", uniqueIds);
     if (error) throw new Error(formatSupabaseError(error));
     return (data ?? []) as PublicMemberProfile[];
@@ -785,6 +787,7 @@ export async function createMember(input: MemberInput) {
     bio: input.bio.trim() || null,
     title: input.title.trim() || null,
     profile_public: input.profile_public,
+    status: "active",
     created_at: timestamp,
     last_login_at: null
   };
@@ -995,6 +998,170 @@ export async function hideProfileReview(memberId: string, reviewId: string) {
 
   const store = readLocalStore();
   store.profile_reviews = store.profile_reviews.map((review) => (review.id === reviewId && review.target_id === memberId ? { ...review, is_visible: false } : review));
+  writeLocalStore(store);
+}
+
+type AdminMemberRow = Omit<MemberProfile, "password_hash"> & {
+  friend_count: number;
+  review_count: number;
+};
+
+function activeFriendship(friendship: Friendship) {
+  return friendship.status === "accepted";
+}
+
+function memberStatus(member: MemberProfile | PublicMemberProfile) {
+  return member.status ?? "active";
+}
+
+async function readAllFriendships() {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("friendships").select("*");
+    if (error) throw new Error(formatSupabaseError(error));
+    return (data ?? []) as Friendship[];
+  }
+  return readLocalStore().friendships;
+}
+
+async function readAllProfileReviews() {
+  if (supabaseConfigured()) {
+    const { data, error } = await supabaseAdmin().from("profile_reviews").select("*");
+    if (error) throw new Error(formatSupabaseError(error));
+    return (data ?? []) as ProfileReview[];
+  }
+  return readLocalStore().profile_reviews;
+}
+
+function jstCalendarParts(value: Date) {
+  const parts = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Tokyo" }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return { year: Number(part("year")), month: Number(part("month")), day: Number(part("day")) };
+}
+
+function jstStartIso(year: number, month: number, day: number) {
+  return new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T00:00:00+09:00`).toISOString();
+}
+
+function memberPeriodStarts() {
+  const today = jstCalendarParts(new Date());
+  const todayDate = new Date(Date.UTC(today.year, today.month - 1, today.day));
+  const mondayOffset = (todayDate.getUTCDay() + 6) % 7;
+  const weekStart = new Date(todayDate);
+  weekStart.setUTCDate(todayDate.getUTCDate() - mondayOffset);
+  return {
+    today: jstStartIso(today.year, today.month, today.day),
+    week: jstStartIso(weekStart.getUTCFullYear(), weekStart.getUTCMonth() + 1, weekStart.getUTCDate()),
+    month: jstStartIso(today.year, today.month, 1)
+  };
+}
+
+export async function listAdminMembers() {
+  const members = supabaseConfigured()
+    ? await (async () => {
+        const { data, error } = await supabaseAdmin()
+          .from("members")
+          .select("id, login_id, display_name, gender, skill_level, bio, title, profile_public, status, created_at, last_login_at")
+          .order("created_at", { ascending: false });
+        if (error) throw new Error(formatSupabaseError(error));
+        return (data ?? []) as AdminMemberRow[];
+      })()
+    : readLocalStore()
+        .members.map((member) => ({
+          id: member.id,
+          login_id: member.login_id,
+          display_name: member.display_name,
+          gender: member.gender,
+          skill_level: member.skill_level,
+          bio: member.bio,
+          title: member.title,
+          profile_public: member.profile_public,
+          status: member.status ?? "active",
+          created_at: member.created_at,
+          last_login_at: member.last_login_at,
+          friend_count: 0,
+          review_count: 0
+        }))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const [friendships, reviews] = await Promise.all([readAllFriendships(), readAllProfileReviews()]);
+  return members.map((member) => ({
+    ...member,
+    status: member.status ?? "active",
+    friend_count: friendships.filter((friendship) => activeFriendship(friendship) && (friendship.requester_id === member.id || friendship.receiver_id === member.id)).length,
+    review_count: reviews.filter((review) => review.target_id === member.id).length
+  }));
+}
+
+export async function getAdminMemberDetail(id: string) {
+  const members = await listAdminMembers();
+  const member = members.find((item) => item.id === id) ?? null;
+  if (!member) return null;
+  const [friends, reviews] = await Promise.all([listFriends(id), listProfileReviews(id, { includeHidden: true })]);
+  return { member, friends, reviews };
+}
+
+export async function getMemberAdminStats() {
+  const members = await listAdminMembers();
+  const starts = memberPeriodStarts();
+  const skillLevels: Record<SkillLevel, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const genderCounts: Record<Gender, number> = { male: 0, female: 0, private: 0 };
+  const titleCounts = new Map<string, number>();
+
+  for (const member of members) {
+    const gender = member.gender === "male" || member.gender === "female" ? member.gender : "private";
+    genderCounts[gender] += 1;
+    if (member.skill_level && member.skill_level >= 1 && member.skill_level <= 5) skillLevels[member.skill_level] += 1;
+    if (member.title) titleCounts.set(member.title, (titleCounts.get(member.title) ?? 0) + 1);
+  }
+
+  return {
+    total: members.length,
+    today: members.filter((member) => member.created_at >= starts.today).length,
+    week: members.filter((member) => member.created_at >= starts.week).length,
+    month: members.filter((member) => member.created_at >= starts.month).length,
+    publicProfiles: members.filter((member) => member.profile_public).length,
+    privateProfiles: members.filter((member) => !member.profile_public).length,
+    active: members.filter((member) => memberStatus(member) === "active").length,
+    disabled: members.filter((member) => memberStatus(member) === "disabled").length,
+    genders: genderCounts,
+    skillLevels,
+    topTitles: Array.from(titleCounts.entries())
+      .map(([title, count]) => ({ title, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  };
+}
+
+export async function setMemberStatusByAdmin(id: string, status: MemberStatus) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("members").update({ status }).eq("id", id);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+  const store = readLocalStore();
+  store.members = store.members.map((member) => (member.id === id ? { ...member, status } : member));
+  writeLocalStore(store);
+}
+
+export async function setMemberProfilePublicByAdmin(id: string, profilePublic: boolean) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("members").update({ profile_public: profilePublic }).eq("id", id);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+  const store = readLocalStore();
+  store.members = store.members.map((member) => (member.id === id ? { ...member, profile_public: profilePublic } : member));
+  writeLocalStore(store);
+}
+
+export async function hideProfileReviewByAdmin(reviewId: string) {
+  if (supabaseConfigured()) {
+    const { error } = await supabaseAdmin().from("profile_reviews").update({ is_visible: false }).eq("id", reviewId);
+    if (error) throw new Error(formatSupabaseError(error));
+    return;
+  }
+  const store = readLocalStore();
+  store.profile_reviews = store.profile_reviews.map((review) => (review.id === reviewId ? { ...review, is_visible: false } : review));
   writeLocalStore(store);
 }
 
