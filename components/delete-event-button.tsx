@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/components/language-ui";
+
 export function DeleteEventButton({
   eventId,
   action,
@@ -9,17 +11,19 @@ export function DeleteEventButton({
   action: (formData: FormData) => Promise<void>;
   className?: string;
 }) {
+  const { t } = useLanguage();
+
   return (
     <form
       action={action}
       onSubmit={(event) => {
-        const confirmed = window.confirm("この活動を削除しますか？\n参加申込データがある場合、その扱いに注意してください。");
+        const confirmed = window.confirm(`${t("delete")}?\n${t("participants")} / ${t("notes")}`);
         if (!confirmed) event.preventDefault();
       }}
     >
       <input name="event_id" type="hidden" value={eventId} />
       <button className={className} type="submit">
-        削除
+        {t("delete")}
       </button>
     </form>
   );

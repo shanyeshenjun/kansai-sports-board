@@ -9,6 +9,8 @@ export type RegistrationStatus = "active" | "cancelled";
 export type OrganizerStatus = "active" | "disabled";
 export type FriendshipStatus = "pending" | "accepted" | "rejected";
 export type MemberStatus = "active" | "disabled";
+export type RelationshipType = "sports_partner" | "best_doubles_partner" | "brothers" | "besties" | "couple";
+export type RelationshipStatus = "pending" | "accepted" | "rejected" | "ended";
 
 export type Event = {
   id: string;
@@ -61,6 +63,7 @@ export type Registration = {
   status?: RegistrationStatus | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  member_id?: string | null;
   created_at: string;
 };
 
@@ -97,6 +100,26 @@ export type ProfileReview = {
   rating_skill?: SkillLevel | null;
   comment?: string | null;
   is_visible: boolean;
+  hidden_by_member?: boolean | null;
+  hidden_by_admin?: boolean | null;
   created_at: string;
   reviewer?: Pick<PublicMemberProfile, "id" | "display_name" | "title"> | null;
+};
+
+export type MemberRelationship = {
+  id: string;
+  requester_id: string;
+  receiver_id: string;
+  relationship_type: RelationshipType;
+  status: RelationshipStatus;
+  requester_public: boolean;
+  receiver_public: boolean;
+  created_at: string;
+  accepted_at?: string | null;
+  ended_at?: string | null;
+  requester?: Pick<PublicMemberProfile, "id" | "display_name" | "title"> | null;
+  receiver?: Pick<PublicMemberProfile, "id" | "display_name" | "title"> | null;
+  other?: Pick<PublicMemberProfile, "id" | "display_name" | "title"> | null;
+  co_registration_count?: number;
+  co_registration_badge?: string;
 };

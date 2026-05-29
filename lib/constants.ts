@@ -1,4 +1,4 @@
-import type { Area, ContactType, EventLevel, EventStatus, Gender, RegistrationStatus, SkillLevel, SportType } from "@/lib/types";
+import type { Area, ContactType, EventLevel, EventStatus, Gender, RegistrationStatus, RelationshipType, SkillLevel, SportType } from "@/lib/types";
 
 export const sports: Array<{ value: SportType; label: string; zh: string; color: string; border: string }> = [
   { value: "badminton", label: "バドミントン", zh: "羽毛球", color: "bg-emerald-100 text-emerald-800", border: "border-l-emerald-500" },
@@ -59,6 +59,22 @@ export const registrationStatuses: Array<{ value: RegistrationStatus; label: str
   { value: "cancelled", label: "キャンセル済み" }
 ];
 
+export const relationshipTypes: Array<{ value: RelationshipType; label: string }> = [
+  { value: "sports_partner", label: "固定球搭子" },
+  { value: "best_doubles_partner", label: "最佳双打搭档" },
+  { value: "brothers", label: "好兄弟" },
+  { value: "besties", label: "好闺蜜" },
+  { value: "couple", label: "情侣" }
+];
+
+export const coRegistrationBadges = [
+  { min: 20, label: "球场老友" },
+  { min: 10, label: "默契搭档" },
+  { min: 5, label: "固定球搭子" },
+  { min: 3, label: "约球熟人" },
+  { min: 1, label: "初识球搭子" }
+] as const;
+
 export const venueOptions = [
   "西SC（阿波座）スポーツセンター",
   "城東スポーツセンター",
@@ -113,6 +129,8 @@ export const contactName = (value: ContactType) => contactTypes.find((item) => i
 export const genderName = (value?: string | null) => genders.find((item) => item.value === value)?.label ?? "非公開";
 export const skillLevelName = (value?: number | null) => skillLevels.find((item) => item.value === value)?.label ?? "未設定";
 export const registrationStatusName = (value?: string | null) => registrationStatuses.find((item) => item.value === value)?.label ?? "有効";
+export const relationshipTypeName = (value?: string | null) => relationshipTypes.find((item) => item.value === value)?.label ?? "固定球搭子";
+export const coRegistrationBadge = (count: number) => coRegistrationBadges.find((badge) => count >= badge.min)?.label ?? "";
 export const venueShortName = (value: string) => {
   if (venueShortNames[value]) return venueShortNames[value];
   const fallback = value.replace(/スポーツセンター/g, "").slice(0, 4);

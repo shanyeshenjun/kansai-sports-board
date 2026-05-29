@@ -8,7 +8,9 @@ import {
   requireOrganizer
 } from "@/app/actions";
 import { DeleteEventButton } from "@/components/delete-event-button";
+import { T } from "@/components/language-ui";
 import { areaName, sportName, statusName, statuses } from "@/lib/constants";
+import { translatedStatusKey } from "@/lib/i18n";
 import { formatDate, formatDateTimeJST, formatTime, listOrganizerEvents } from "@/lib/store";
 
 export default async function OrganizerPage() {
@@ -21,16 +23,20 @@ export default async function OrganizerPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-teal-700">Organizer Console</p>
-            <h1 className="mt-1 text-2xl font-black text-slate-950">主催者后台</h1>
-            <p className="mt-1 text-sm text-slate-600">{organizer.display_name} さんの活動だけを管理できます。</p>
+            <h1 className="mt-1 text-2xl font-black text-slate-950">
+              <T textKey="organizerConsole" />
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              <T textKey="organizerConsoleDescription" values={{ name: organizer.display_name }} />
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <Link className="touch-target inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-black text-white" href="/organizer/events/new">
-              新しい活動
+              <T textKey="newEvent" />
             </Link>
             <form action={organizerLogoutAction}>
               <button className="touch-target w-full rounded-md border border-line bg-white px-4 py-3 text-sm font-bold" type="submit">
-                ログアウト
+                <T textKey="logout" />
               </button>
             </form>
           </div>
@@ -51,14 +57,18 @@ export default async function OrganizerPage() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${sport.color}`}>{sport.label}</span>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{areaName(event.area).label}</span>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-black ${status.color}`}>{status.label}</span>
-                      {deleted ? <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">削除済み</span> : null}
+                      {deleted ? (
+                        <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">
+                          <T textKey="deleted" />
+                        </span>
+                      ) : null}
                     </div>
                     <h2 className="mt-2 text-lg font-black leading-snug text-slate-950">{event.title}</h2>
                     <p className="mt-1 text-sm font-medium text-slate-600">
-                      {formatDate(event.start_datetime)} {formatTime(event.start_datetime)} / {event.venue_name} / {event.current_participants}/{event.max_participants}名
+                      {formatDate(event.start_datetime)} {formatTime(event.start_datetime)} / {event.venue_name} / {event.current_participants}/{event.max_participants}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      作成: {formatDateTimeJST(event.created_at)} / 更新: {formatDateTimeJST(event.updated_at)}
+                      <T textKey="createdLabel" />: {formatDateTimeJST(event.created_at)} / <T textKey="updatedLabel" />: {formatDateTimeJST(event.updated_at)}
                     </p>
                   </div>
 
@@ -68,12 +78,12 @@ export default async function OrganizerPage() {
                       <select className="touch-target min-w-0 rounded-md border border-line px-3 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" name="status" defaultValue={event.status} disabled={deleted}>
                         {statuses.map((item) => (
                           <option key={item.value} value={item.value}>
-                            {item.label}
+                            <T textKey={translatedStatusKey(item.value)} />
                           </option>
                         ))}
                       </select>
                       <button className="touch-target rounded-md border border-line px-4 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                        変更
+                        <T textKey="change" />
                       </button>
                     </form>
 
@@ -81,18 +91,18 @@ export default async function OrganizerPage() {
                       <form action={finishOrganizerEventAction}>
                         <input name="event_id" type="hidden" value={event.id} />
                         <button className="touch-target w-full rounded-md border border-line px-3 py-2 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                          終了にする
+                          <T textKey="finish" />
                         </button>
                       </form>
                       <form action={cancelOrganizerEventAction}>
                         <input name="event_id" type="hidden" value={event.id} />
                         <button className="touch-target w-full rounded-md border border-amber-200 px-3 py-2 text-sm font-bold text-amber-700 disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                          キャンセル
+                          <T textKey="cancel" />
                         </button>
                       </form>
                       {deleted ? (
                         <button className="touch-target w-full rounded-md border border-line px-3 py-2 text-sm font-bold text-slate-400" type="button" disabled>
-                          削除済み
+                          <T textKey="deleted" />
                         </button>
                       ) : (
                         <DeleteEventButton eventId={event.id} action={deleteOrganizerEventAction} />
@@ -101,10 +111,10 @@ export default async function OrganizerPage() {
 
                     <div className="grid grid-cols-3 gap-2">
                       <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/organizer/events/${event.id}/edit`}>
-                        編集
+                        <T textKey="edit" />
                       </Link>
                       <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/organizer/events/${event.id}/registrations`}>
-                        参加者
+                        <T textKey="participants" />
                       </Link>
                       <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/organizer/events/${event.id}/registrations/export`}>
                         CSV
@@ -117,8 +127,12 @@ export default async function OrganizerPage() {
           })
         ) : (
           <div className="rounded-xl border border-dashed border-line bg-white p-8 text-center">
-            <h2 className="font-black text-slate-900">まだ活動がありません</h2>
-            <p className="mt-2 text-sm text-slate-500">最初の活動を作成して、参加者に公開しましょう。</p>
+            <h2 className="font-black text-slate-900">
+              <T textKey="noEvents" />
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              <T textKey="noEventsDescription" />
+            </p>
           </div>
         )}
       </div>

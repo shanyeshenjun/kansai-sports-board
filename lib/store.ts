@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { promisify } from "util";
 import { createClient } from "@supabase/supabase-js";
+import { coRegistrationBadge } from "@/lib/constants";
 import type {
   Area,
   Event,
@@ -10,6 +11,7 @@ import type {
   Friendship,
   FriendshipStatus,
   Gender,
+  MemberRelationship,
   MemberProfile,
   MemberStatus,
   Organizer,
@@ -18,6 +20,8 @@ import type {
   PublicMemberProfile,
   Registration,
   RegistrationStatus,
+  RelationshipStatus,
+  RelationshipType,
   SkillLevel,
   SportType
 } from "@/lib/types";
@@ -29,6 +33,7 @@ type Store = {
   members: MemberProfile[];
   friendships: Friendship[];
   profile_reviews: ProfileReview[];
+  member_relationships: MemberRelationship[];
 };
 
 type RegistrationResult = {
@@ -238,6 +243,7 @@ const seedOrganizers: Organizer[] = [];
 const seedMembers: MemberProfile[] = [];
 const seedFriendships: Friendship[] = [];
 const seedProfileReviews: ProfileReview[] = [];
+const seedMemberRelationships: MemberRelationship[] = [];
 
 function supabaseConfigured() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -269,12 +275,21 @@ function cloneStore(store: Store): Store {
     organizers: (store.organizers ?? []).map((item) => ({ ...item })),
     members: (store.members ?? []).map((item) => ({ ...item })),
     friendships: (store.friendships ?? []).map((item) => ({ ...item })),
-    profile_reviews: (store.profile_reviews ?? []).map((item) => ({ ...item }))
+    profile_reviews: (store.profile_reviews ?? []).map((item) => ({ ...item })),
+    member_relationships: (store.member_relationships ?? []).map((item) => ({ ...item }))
   };
 }
 
 function seedStore(): Store {
-  return cloneStore({ events: seedEvents, registrations: seedRegistrations, organizers: seedOrganizers, members: seedMembers, friendships: seedFriendships, profile_reviews: seedProfileReviews });
+  return cloneStore({
+    events: seedEvents,
+    registrations: seedRegistrations,
+    organizers: seedOrganizers,
+    members: seedMembers,
+    friendships: seedFriendships,
+    profile_reviews: seedProfileReviews,
+    member_relationships: seedMemberRelationships
+  });
 }
 
 function memoryStore(): Store {
@@ -296,7 +311,15 @@ function readLocalStore(): Store {
       return store;
     }
     const store = JSON.parse(readFileSync(dataFile, "utf8")) as Store;
-    return { events: store.events ?? [], registrations: store.registrations ?? [], organizers: store.organizers ?? [], members: store.members ?? [], friendships: store.friendships ?? [], profile_reviews: store.profile_reviews ?? [] };
+    return {
+      events: store.events ?? [],
+      registrations: store.registrations ?? [],
+      organizers: store.organizers ?? [],
+      members: store.members ?? [],
+      friendships: store.friendships ?? [],
+      profile_reviews: store.profile_reviews ?? [],
+      member_relationships: store.member_relationships ?? []
+    };
   } catch {
     return memoryStore();
   }
@@ -527,7 +550,17 @@ export async function softDeleteEvent(id: string, ownerOrganizerId?: string) {
 
 export async function register(
   eventId: string,
-  input: { participant_name: string; contact: string; number_of_people: number; note: string; display_name: string; gender: Gender; skill_level: SkillLevel | null; is_public: boolean }
+  input: {
+    participant_name: string;
+    contact: string;
+    number_of_people: number;
+    note: string;
+    display_name: string;
+    gender: Gender;
+    skill_level: SkillLevel | null;
+    is_public: boolean;
+    member_id?: string | null;
+  }
 ): Promise<RegistrationResult> {
   const displayName = input.is_public ? input.display_name.trim() : input.display_name.trim();
   if (input.is_public && !displayName) return { ok: false, message: "公開表示する場合は、表示用ニックネームを入力してください。" };
@@ -548,7 +581,8 @@ export async function register(
         p_display_name: displayName || null,
         p_gender: input.gender,
         p_skill_level: input.skill_level,
-        p_is_public: input.is_public
+        p_is_public: input.is_public,
+        p_member_id: input.member_id ?? null
       })
       .single();
 
@@ -578,6 +612,7 @@ export async function register(
     status: "active",
     cancelled_at: null,
     cancellation_reason: null,
+    member_id: input.member_id ?? null,
     created_at: new Date().toISOString()
   });
   store.events = store.events.map((item) =>

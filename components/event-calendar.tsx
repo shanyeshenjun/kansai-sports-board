@@ -116,14 +116,14 @@ export function EventCalendar({ events }: { events: Event[] }) {
     <aside className="rounded-lg border border-line bg-white p-4 shadow-sm lg:sticky lg:top-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-base font-black text-slate-950">Calendar</h2>
+          <h2 className="text-base font-black text-slate-950">{t("calendar")}</h2>
           <p className="mt-0.5 text-xs font-medium text-slate-500">{t("date")} / {t("openNow")}</p>
         </div>
         <div className="flex gap-1">
-          <button className="touch-target h-9 w-9 rounded-md border border-line text-sm font-black" type="button" onClick={() => moveMonth(-1)} aria-label="前の月">
+          <button className="touch-target h-9 w-9 rounded-md border border-line text-sm font-black" type="button" onClick={() => moveMonth(-1)} aria-label={t("previousMonth")}>
             &lt;
           </button>
-          <button className="touch-target h-9 w-9 rounded-md border border-line text-sm font-black" type="button" onClick={() => moveMonth(1)} aria-label="次の月">
+          <button className="touch-target h-9 w-9 rounded-md border border-line text-sm font-black" type="button" onClick={() => moveMonth(1)} aria-label={t("nextMonth")}>
             &gt;
           </button>
         </div>
@@ -164,7 +164,7 @@ export function EventCalendar({ events }: { events: Event[] }) {
       </div>
 
       <div className="mt-4 rounded-md bg-slate-50 p-3">
-        <p className="text-xs font-black text-slate-500">{selectedDate.replaceAll("-", "/")} の活動</p>
+        <p className="text-xs font-black text-slate-500">{t("selectedDateEvents", { date: selectedDate.replaceAll("-", "/") })}</p>
         {selectedEvents.length ? (
           <div className="mt-2 grid gap-2">
             {selectedEvents.map((event) => (
@@ -179,7 +179,7 @@ export function EventCalendar({ events }: { events: Event[] }) {
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-sm font-medium text-slate-500">この日の活動はまだありません。</p>
+          <p className="mt-2 text-sm font-medium text-slate-500">{t("noEventsOnDate")}</p>
         )}
       </div>
     </aside>

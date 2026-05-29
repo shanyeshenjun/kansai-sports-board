@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { currentMember, registerAction } from "@/app/actions";
 import { SkillLevelGuide, T } from "@/components/language-ui";
 import { RegistrationPublicFields } from "@/components/registration-public-fields";
-import { areaName, contactName, genderName, levelName, skillLevelName, skillLevels, sportName, statusName, venueMapUrl } from "@/lib/constants";
-import { translatedStatusKey } from "@/lib/i18n";
+import { areaName, contactName, levelName, skillLevels, sportName, statusName, venueMapUrl } from "@/lib/constants";
+import { translatedGenderKey, translatedSkillLevelKey, translatedStatusKey } from "@/lib/i18n";
 import { formatCancelDeadlineJST, formatDate, formatTime, getEvent, listRegistrations, yen } from "@/lib/store";
 import type { Gender, Registration, SkillLevel } from "@/lib/types";
 import type { ReactNode } from "react";
@@ -94,21 +94,21 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
           <article className="rounded-xl border border-line bg-white p-4 shadow-sm">
             <h2 className="font-black text-slate-950"><T textKey="participantMembers" /></h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <Stat label="男性" value={`${genderStats.male}人`} />
-              <Stat label="女性" value={`${genderStats.female}人`} />
-              <Stat label="非公開" value={`${genderStats.private}人`} />
+              <Stat label={<T textKey="male" />} value={`${genderStats.male}人`} />
+              <Stat label={<T textKey="female" />} value={`${genderStats.female}人`} />
+              <Stat label={<T textKey="private" />} value={`${genderStats.private}人`} />
             </div>
             <h3 className="mt-4 text-sm font-black text-slate-800"><T textKey="levelDistribution" /></h3>
             <div className="mt-2 grid gap-2 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700 sm:grid-cols-2">
               {skillLevels.map((skill) => (
                 <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-line" key={skill.value}>
-                  <span>{skill.label}</span>
+                  <span><T textKey={translatedSkillLevelKey(skill.value)} /></span>
                   <span className="font-black text-slate-950">{skillStats[skill.value]}人</span>
                 </div>
               ))}
               {skillStats.unset ? (
                 <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-line">
-                  <span>未設定</span>
+                  <span><T textKey="titleUnset" /></span>
                   <span className="font-black text-slate-950">{skillStats.unset}人</span>
                 </div>
               ) : null}
@@ -122,8 +122,12 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
                 {publicMembers.map((member) => (
                   <span className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-sm font-bold text-slate-800" key={member.id}>
                     {member.display_name}
-                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{genderName(member.gender)}</span>
-                    <span className="ml-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs text-teal-800">{skillLevelName(member.skill_level)}</span>
+                    <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                      <T textKey={translatedGenderKey(member.gender)} />
+                    </span>
+                    <span className="ml-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs text-teal-800">
+                      <T textKey={translatedSkillLevelKey(member.skill_level)} />
+                    </span>
                   </span>
                 ))}
               </div>
@@ -135,7 +139,7 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
 
         <aside className="rounded-xl border border-line bg-white p-4 shadow-sm lg:self-start">
           <h2 className="text-lg font-black text-slate-950"><T textKey="registration" /></h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">アカウント登録なしで申し込みできます。連絡に必要な範囲だけ入力してください。</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500"><T textKey="registrationDescription" /></p>
           <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs font-bold leading-5 text-slate-600">
             <T textKey="cancelRule" /> {formatCancelDeadlineJST(event.start_datetime)}
           </p>
@@ -143,7 +147,11 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
           <p className="mt-2 rounded-md bg-teal-50 p-2 text-xs font-bold leading-5 text-teal-900">
             <T textKey="publicHint" />
           </p>
-          {query.error ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">{String(query.error)}</p> : null}
+          {query.error ? (
+            <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-bold text-red-700">
+              <T textKey="operationFailed" />
+            </p>
+          ) : null}
           {canRegister ? (
             <form action={action} className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm font-bold text-slate-700">
@@ -171,9 +179,13 @@ export default async function EventDetail({ params, searchParams }: { params: Pa
               </button>
             </form>
           ) : (
-            <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-800">この活動は現在申し込みできません。</p>
+            <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-bold text-amber-800">
+              <T textKey="cannotRegisterNow" />
+            </p>
           )}
-          <p className="mt-3 text-xs leading-5 text-slate-500">申し込み後は、主催者の連絡先で集合場所、持ち物、参加可否を確認してください。</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            <T textKey="afterRegistrationNote" />
+          </p>
           <Link className="touch-target mt-3 flex items-center justify-center rounded-lg border border-line px-4 py-3 text-sm font-black text-slate-700" href="/cancel">
             <T textKey="cancelRegistration" />
           </Link>
@@ -192,7 +204,7 @@ function Info({ label, value }: { label: ReactNode; value: ReactNode }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 px-3 py-3 ring-1 ring-line">
       <div className="text-xs font-bold text-slate-500">{label}</div>

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { cancelEventAction, changeStatusAction, deleteEventAction, finishEventAction, logoutAction, requireAdmin } from "@/app/actions";
 import { DeleteEventButton } from "@/components/delete-event-button";
+import { T } from "@/components/language-ui";
 import { areaName, sportName, statusName, statuses } from "@/lib/constants";
+import { translatedStatusKey } from "@/lib/i18n";
 import { formatDate, formatDateTimeJST, formatTime, listEvents } from "@/lib/store";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -21,25 +23,29 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
       <div className="mb-4 rounded-lg border border-line bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-950">管理画面</h1>
-            <p className="mt-1 text-sm text-slate-600">活動の作成、編集、ステータス変更、参加者確認を行います。</p>
+            <h1 className="text-2xl font-black text-slate-950">
+              <T textKey="adminPage" />
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              <T textKey="eventManagementDescription" />
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <Link className="touch-target inline-flex items-center justify-center rounded-md bg-teal-700 px-4 py-3 text-sm font-black text-white" href="/admin/events/new">
-              活動を作成
+              <T textKey="createEvent" />
             </Link>
             <Link className="touch-target inline-flex items-center justify-center rounded-md border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-black text-teal-800" href="/admin/organizers">
-              主催者管理
+              <T textKey="organizerManagement" />
             </Link>
             <Link className="touch-target inline-flex items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800" href="/admin/members">
-              会員管理
+              <T textKey="memberManagement" />
             </Link>
             <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line bg-white px-4 py-3 text-sm font-bold" href={showDeleted ? "/admin" : "/admin?deleted=1"}>
-              {showDeleted ? "削除済みを隠す" : "削除済みも表示"}
+              <T textKey={showDeleted ? "hideDeleted" : "showDeleted"} />
             </Link>
             <form action={logoutAction}>
               <button className="touch-target w-full rounded-md border border-line bg-white px-4 py-3 text-sm font-bold" type="submit">
-                ログアウト
+                <T textKey="logout" />
               </button>
             </form>
           </div>
@@ -59,14 +65,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                     <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${sport.color}`}>{sport.label}</span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{areaName(event.area).label}</span>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-black ${status.color}`}>{status.label}</span>
-                    {deleted ? <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">削除済み</span> : null}
+                    {deleted ? (
+                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-black text-white">
+                        <T textKey="deleted" />
+                      </span>
+                    ) : null}
                   </div>
                   <h2 className="mt-2 text-lg font-black leading-snug text-slate-950">{event.title}</h2>
                   <p className="mt-1 text-sm font-medium text-slate-600">
-                    {formatDate(event.start_datetime)} {formatTime(event.start_datetime)} / {event.venue_name} / {event.current_participants}/{event.max_participants}名
+                    {formatDate(event.start_datetime)} {formatTime(event.start_datetime)} / {event.venue_name} / {event.current_participants}/{event.max_participants}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    作成: {formatDateTimeJST(event.created_at)} / 更新: {formatDateTimeJST(event.updated_at)}
+                    <T textKey="createdLabel" />: {formatDateTimeJST(event.created_at)} / <T textKey="updatedLabel" />: {formatDateTimeJST(event.updated_at)}
                   </p>
                 </div>
 
@@ -76,12 +86,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                     <select className="touch-target min-w-0 rounded-md border border-line px-3 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" name="status" defaultValue={event.status} disabled={deleted}>
                       {statuses.map((item) => (
                         <option key={item.value} value={item.value}>
-                          {item.label}
+                          <T textKey={translatedStatusKey(item.value)} />
                         </option>
                       ))}
                     </select>
                     <button className="touch-target rounded-md border border-line px-4 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                      変更
+                      <T textKey="change" />
                     </button>
                   </form>
 
@@ -89,18 +99,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
                     <form action={finishEventAction}>
                       <input name="event_id" type="hidden" value={event.id} />
                       <button className="touch-target w-full rounded-md border border-line px-3 py-2 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                        終了にする
+                        <T textKey="finish" />
                       </button>
                     </form>
                     <form action={cancelEventAction}>
                       <input name="event_id" type="hidden" value={event.id} />
                       <button className="touch-target w-full rounded-md border border-amber-200 px-3 py-2 text-sm font-bold text-amber-700 disabled:bg-slate-100 disabled:text-slate-400" type="submit" disabled={deleted}>
-                        キャンセル
+                        <T textKey="cancel" />
                       </button>
                     </form>
                     {deleted ? (
                       <button className="touch-target w-full rounded-md border border-line px-3 py-2 text-sm font-bold text-slate-400" type="button" disabled>
-                        削除済み
+                        <T textKey="deleted" />
                       </button>
                     ) : (
                       <DeleteEventButton eventId={event.id} action={deleteEventAction} />
@@ -109,10 +119,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
 
                   <div className="grid grid-cols-3 gap-2">
                     <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/admin/events/${event.id}/edit`}>
-                      編集
+                      <T textKey="edit" />
                     </Link>
                     <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/admin/events/${event.id}/registrations`}>
-                      参加者
+                      <T textKey="participants" />
                     </Link>
                     <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 py-2 text-center text-sm font-bold" href={`/admin/events/${event.id}/registrations/export`}>
                       CSV

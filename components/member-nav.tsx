@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { currentMember, memberLogoutAction } from "@/app/actions";
+import { T } from "@/components/language-ui";
 
 export async function MemberNav() {
   const member = await currentMember();
@@ -8,10 +9,10 @@ export async function MemberNav() {
     return (
       <div className="flex items-center gap-2">
         <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 text-sm font-bold text-slate-700" href="/login">
-          ログイン
+          <T textKey="login" />
         </Link>
         <Link className="touch-target hidden items-center justify-center rounded-md bg-slate-950 px-3 text-sm font-bold text-white sm:inline-flex" href="/register">
-          登録
+          <T textKey="registerAccount" />
         </Link>
       </div>
     );
@@ -20,11 +21,11 @@ export async function MemberNav() {
   return (
     <div className="flex items-center gap-2">
       <Link className="touch-target inline-flex items-center justify-center rounded-md border border-line px-3 text-sm font-bold text-slate-700" href="/me">
-        マイページ
+        <T textKey="myPage" />
       </Link>
       <form action={memberLogoutAction}>
         <button className="touch-target hidden items-center justify-center rounded-md border border-line px-3 text-sm font-bold text-slate-600 sm:inline-flex" type="submit">
-          ログアウト
+          <T textKey="logout" />
         </button>
       </form>
     </div>

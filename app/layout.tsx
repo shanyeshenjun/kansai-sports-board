@@ -31,17 +31,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <div className="flex shrink-0 items-center gap-2">
                 <LanguageSwitcher />
                 <MemberNav />
-                <Link className="touch-target hidden items-center justify-center rounded-md border border-line px-3 text-sm font-bold sm:inline-flex" href="/admin">
-                  管理画面
-                </Link>
               </div>
             </div>
           </header>
           {children}
           <footer className="border-t border-line bg-white">
             <div className="mx-auto flex max-w-5xl flex-wrap gap-4 px-4 py-5 text-xs font-bold text-slate-500">
-              <Link href="/terms">利用規約</Link>
-              <Link href="/privacy">プライバシーポリシー</Link>
+              <Link href="/terms">
+                <T textKey="terms" />
+              </Link>
+              <Link href="/privacy">
+                <T textKey="privacy" />
+              </Link>
             </div>
           </footer>
         </LanguageProvider>
